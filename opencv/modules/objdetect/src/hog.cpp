@@ -83,9 +83,9 @@ bool HOGDescriptor::checkDetectorSize() const
         detectorSize == descriptorSize + 1;
 }
 
-void HOGDescriptor::setSVMDetector(const vector<float>& _svmDetector)
+void HOGDescriptor::setSVMDetector(InputArray _svmDetector)
 {
-    svmDetector = _svmDetector;
+    _svmDetector.getMat().convertTo(svmDetector, CV_32F);
     CV_Assert( checkDetectorSize() );
 }
 
@@ -109,6 +109,7 @@ bool HOGDescriptor::read(FileNode& obj)
     obj["histogramNormType"] >> histogramNormType;
     obj["L2HysThreshold"] >> L2HysThreshold;
     obj["gammaCorrection"] >> gammaCorrection;
+    obj["nlevels"] >> nlevels;
     
     FileNode vecNode = obj["SVMDetector"];
     if( vecNode.isSeq() )
@@ -134,7 +135,8 @@ void HOGDescriptor::write(FileStorage& fs, const String& objName) const
     << "winSigma" << getWinSigma()
     << "histogramNormType" << histogramNormType
     << "L2HysThreshold" << L2HysThreshold
-    << "gammaCorrection" << gammaCorrection;
+    << "gammaCorrection" << gammaCorrection
+    << "nlevels" << nlevels;
     if( !svmDetector.empty() )
         fs << "SVMDetector" << "[:" << svmDetector << "]";
     fs << "}";
@@ -166,6 +168,7 @@ void HOGDescriptor::copyTo(HOGDescriptor& c) const
     c.L2HysThreshold = L2HysThreshold;
     c.gammaCorrection = gammaCorrection;
     c.svmDetector = svmDetector;
+    c.nlevels = nlevels;
 }
 
 void HOGDescriptor::computeGradient(const Mat& img, Mat& grad, Mat& qangle,
@@ -942,7 +945,7 @@ struct HOGInvoker
     HOGInvoker( const HOGDescriptor* _hog, const Mat& _img,
                 double _hitThreshold, Size _winStride, Size _padding,
                 const double* _levelScale, ConcurrentRectVector* _vec, 
-                vector<double>* _weights=0, vector<double>* _scales=0 ) 
+                ConcurrentDoubleVector* _weights=0, ConcurrentDoubleVector* _scales=0 ) 
     {
         hog = _hog;
         img = _img;
@@ -1002,8 +1005,8 @@ struct HOGInvoker
     Size padding;
     const double* levelScale;
     ConcurrentRectVector* vec;
-    vector<double>* weights;
-    vector<double>* scales;
+    ConcurrentDoubleVector* weights;
+    ConcurrentDoubleVector* scales;
 };
 
 
@@ -1029,14 +1032,18 @@ void HOGDescriptor::detectMultiScale(
     levelScale.resize(levels);
 
     ConcurrentRectVector allCandidates;
-
+    ConcurrentDoubleVector tempScales;
+    ConcurrentDoubleVector tempWeights;
     vector<double> foundScales;
     
     parallel_for(BlockedRange(0, (int)levelScale.size()),
-                 HOGInvoker(this, img, hitThreshold, winStride, padding, &levelScale[0], &allCandidates, &foundWeights, &foundScales));
+                 HOGInvoker(this, img, hitThreshold, winStride, padding, &levelScale[0], &allCandidates, &tempWeights, &tempScales));
 
-    foundLocations.resize(allCandidates.size());
-    std::copy(allCandidates.begin(), allCandidates.end(), foundLocations.begin());
+    std::copy(tempScales.begin(), tempScales.end(), back_inserter(foundScales));
+    foundLocations.clear();
+    std::copy(allCandidates.begin(), allCandidates.end(), back_inserter(foundLocations));
+    foundWeights.clear();
+    std::copy(tempWeights.begin(), tempWeights.end(), back_inserter(foundWeights));
 
     if ( useMeanshiftGrouping )
     {

@@ -139,8 +139,8 @@ void CV_FeatureDetectorTest::compareKeypointSets( const vector<KeyPoint>& validK
         return;
     }
 
-    int progress = 0, progressCount = validKeypoints.size() * calcKeypoints.size();
-    int badPointCount = 0, commonPointCount = max(validKeypoints.size(), calcKeypoints.size());
+    int progress = 0, progressCount = (int)(validKeypoints.size() * calcKeypoints.size());
+    int badPointCount = 0, commonPointCount = max((int)validKeypoints.size(), (int)calcKeypoints.size());
     for( size_t v = 0; v < validKeypoints.size(); v++ )
     {
         int nearestIdx = -1;
@@ -148,12 +148,12 @@ void CV_FeatureDetectorTest::compareKeypointSets( const vector<KeyPoint>& validK
 
         for( size_t c = 0; c < calcKeypoints.size(); c++ )
         {
-            progress = update_progress( progress, v*calcKeypoints.size() + c, progressCount, 0 );
+            progress = update_progress( progress, (int)(v*calcKeypoints.size() + c), progressCount, 0 );
             float curDist = (float)norm( calcKeypoints[c].pt - validKeypoints[v].pt );
             if( curDist < minDist )
             {
                 minDist = curDist;
-                nearestIdx = c;
+                nearestIdx = (int)c;
             }
         }
 
@@ -256,7 +256,7 @@ static void writeMatInBin( const Mat& mat, const string& filename )
         fwrite( (void*)&mat.rows, sizeof(int), 1, f );
         fwrite( (void*)&mat.cols, sizeof(int), 1, f );
         fwrite( (void*)&type, sizeof(int), 1, f );
-        int dataSize = mat.step * mat.rows * mat.channels();
+        int dataSize = (int)(mat.step * mat.rows * mat.channels());
         fwrite( (void*)&dataSize, sizeof(int), 1, f );
         fwrite( (void*)mat.data, 1, dataSize, f );
         fclose(f);
@@ -269,13 +269,15 @@ static Mat readMatFromBin( const string& filename )
     if( f )
     {
         int rows, cols, type, dataSize;
-        fread( (void*)&rows, sizeof(int), 1, f );
-        fread( (void*)&cols, sizeof(int), 1, f );
-        fread( (void*)&type, sizeof(int), 1, f );
-        fread( (void*)&dataSize, sizeof(int), 1, f );
+        size_t elements_read1 = fread( (void*)&rows, sizeof(int), 1, f );
+        size_t elements_read2 = fread( (void*)&cols, sizeof(int), 1, f );
+        size_t elements_read3 = fread( (void*)&type, sizeof(int), 1, f );
+        size_t elements_read4 = fread( (void*)&dataSize, sizeof(int), 1, f );
+        CV_Assert(elements_read1 == 1 && elements_read2 == 1 && elements_read3 == 1 && elements_read4 == 1);
 
         uchar* data = (uchar*)cvAlloc(dataSize);
-        fread( (void*)data, 1, dataSize, f );
+        size_t elements_read = fread( (void*)data, 1, dataSize, f );
+        CV_Assert(elements_read == (size_t)(dataSize));
         fclose(f);
 
         return Mat( rows, cols, type, data );
@@ -440,7 +442,7 @@ protected:
             fs.open( string(ts->get_data_path()) + FEATURES2D_DIR + "/keypoints.xml.gz", FileStorage::WRITE );
             if( fs.isOpened() )
             {
-                SurfFeatureDetector fd;
+                ORB fd;
                 fd.detect(img, keypoints);
                 write( fs, "keypoints", keypoints );
             }
@@ -491,7 +493,7 @@ private:
     CV_DescriptorExtractorTest& operator=(const CV_DescriptorExtractorTest&) { return *this; }
 };
 
-template<typename T, typename Distance>
+/*template<typename T, typename Distance>
 class CV_CalonderDescriptorExtractorTest : public CV_DescriptorExtractorTest<Distance>
 {
 public:
@@ -506,7 +508,7 @@ protected:
                 new CalonderDescriptorExtractor<T>( string(CV_DescriptorExtractorTest<Distance>::ts->get_data_path()) +
                                                     FEATURES2D_DIR + "/calonder_classifier.rtc");
     }
-};
+};*/
 
 /****************************************************************************************\
 *                       Algorithmic tests for descriptor matchers                        *
@@ -669,7 +671,7 @@ void CV_DescriptorMatcherTest::matchTest( const Mat& query, const Mat& train )
             int badCount = 0;
             for( size_t i = 0; i < matches.size(); i++ )
             {
-                DMatch match = matches[i];
+                DMatch& match = matches[i];
                 if( (match.queryIdx != (int)i) || (match.trainIdx != (int)i*countFactor) || (match.imgIdx != 0) )
                     badCount++;
             }
@@ -678,6 +680,33 @@ void CV_DescriptorMatcherTest::matchTest( const Mat& query, const Mat& train )
                 ts->printf( cvtest::TS::LOG, "%f - too large bad matches part while test match() function (1).\n",
                             (float)badCount/(float)queryDescCount );
                 ts->set_failed_test_info( cvtest::TS::FAIL_INVALID_OUTPUT );
+            }
+        }
+    }
+
+    // test const version of match() for the same query and test descriptors
+    {
+        vector<DMatch> matches;
+        dmatcher->match( query, query, matches );
+
+        if( (int)matches.size() != query.rows )
+        {
+            ts->printf(cvtest::TS::LOG, "Incorrect matches count while test match() function for the same query and test descriptors (1).\n");
+            ts->set_failed_test_info( cvtest::TS::FAIL_INVALID_OUTPUT );
+        }
+        else
+        {
+            for( size_t i = 0; i < matches.size(); i++ )
+            {
+                DMatch& match = matches[i];
+                //std::cout << match.distance << std::endl;
+
+                if( match.queryIdx != (int)i || match.trainIdx != (int)i || std::abs(match.distance) > FLT_EPSILON )
+                {
+                    ts->printf( cvtest::TS::LOG, "Bad match (i=%d, queryIdx=%d, trainIdx=%d, distance=%f) while test match() function for the same query and test descriptors (1).\n",
+                                i, match.queryIdx, match.trainIdx, match.distance );
+                    ts->set_failed_test_info( cvtest::TS::FAIL_INVALID_OUTPUT );
+                }
             }
         }
     }
@@ -709,7 +738,7 @@ void CV_DescriptorMatcherTest::matchTest( const Mat& query, const Mat& train )
             int badCount = 0;
             for( size_t i = 0; i < matches.size(); i++ )
             {
-                DMatch match = matches[i];
+                DMatch& match = matches[i];
                 int shift = dmatcher->isMaskSupported() ? 1 : 0;
                 {
                     if( i < queryDescCount/2 )
@@ -762,7 +791,7 @@ void CV_DescriptorMatcherTest::knnMatchTest( const Mat& query, const Mat& train 
                     int localBadCount = 0;
                     for( int k = 0; k < knn; k++ )
                     {
-                        DMatch match = matches[i][k];
+                        DMatch& match = matches[i][k];
                         if( (match.queryIdx != (int)i) || (match.trainIdx != (int)i*countFactor+k) || (match.imgIdx != 0) )
                             localBadCount++;
                     }
@@ -814,7 +843,7 @@ void CV_DescriptorMatcherTest::knnMatchTest( const Mat& query, const Mat& train 
                     int localBadCount = 0;
                     for( int k = 0; k < knn; k++ )
                     {
-                        DMatch match = matches[i][k];
+                        DMatch& match = matches[i][k];
                         {
                             if( i < queryDescCount/2 )
                             {
@@ -866,7 +895,7 @@ void CV_DescriptorMatcherTest::radiusMatchTest( const Mat& query, const Mat& tra
                     badCount++;
                 else
                 {
-                    DMatch match = matches[i][0];
+                    DMatch& match = matches[i][0];
                     if( (match.queryIdx != (int)i) || (match.trainIdx != (int)i*countFactor) || (match.imgIdx != 0) )
                         badCount++;
                 }
@@ -918,7 +947,7 @@ void CV_DescriptorMatcherTest::radiusMatchTest( const Mat& query, const Mat& tra
                 int localBadCount = 0;
                 for( int k = 0; k < needMatchCount; k++ )
                 {
-                    DMatch match = matches[i][k];
+                    DMatch& match = matches[i][k];
                     {
                         if( i < queryDescCount/2 )
                         {
@@ -991,21 +1020,9 @@ TEST( Features2d_Detector_MSER, regression )
     test.safe_run();
 }
 
-TEST( Features2d_Detector_SIFT, regression )
-{
-    CV_FeatureDetectorTest test( "detector-sift", FeatureDetector::create("SIFT") );
-    test.safe_run();
-}
-
 TEST( Features2d_Detector_STAR, regression )
 {
     CV_FeatureDetectorTest test( "detector-star", FeatureDetector::create("STAR") );
-    test.safe_run();
-}
-
-TEST( Features2d_Detector_SURF, regression )
-{
-    CV_FeatureDetectorTest test( "detector-surf", FeatureDetector::create("SURF") );
     test.safe_run();
 }
 
@@ -1027,27 +1044,10 @@ TEST( Features2d_Detector_PyramidFAST, regression )
     test.safe_run();
 }
 
-/*
- * Descriptors
- */
-TEST( Features2d_DescriptorExtractor_SIFT, regression )
-{
-    CV_DescriptorExtractorTest<L2<float> > test( "descriptor-sift", 0.03f,
-                                                  DescriptorExtractor::create("SIFT"), 8.06652f  );
-    test.safe_run();
-}
-
-TEST( Features2d_DescriptorExtractor_SURF, regression )
-{
-    CV_DescriptorExtractorTest<L2<float> > test( "descriptor-surf",  0.035f,
-                                                 DescriptorExtractor::create("SURF"), 0.147372f );
-    test.safe_run();
-}
-
 TEST( Features2d_DescriptorExtractor_ORB, regression )
 {
     // TODO adjust the parameters below
-    CV_DescriptorExtractorTest<Hamming> test( "descriptor-orb",  (CV_DescriptorExtractorTest<Hamming>::DistanceType)1.0f,
+    CV_DescriptorExtractorTest<Hamming> test( "descriptor-orb",  (CV_DescriptorExtractorTest<Hamming>::DistanceType)12.f,
                                                  DescriptorExtractor::create("ORB"), 0.010f );
     test.safe_run();
 }
@@ -1056,20 +1056,6 @@ TEST( Features2d_DescriptorExtractor_BRIEF, regression )
 {
     CV_DescriptorExtractorTest<Hamming> test( "descriptor-brief",  1,
                                                DescriptorExtractor::create("BRIEF"), 0.00527548f );
-    test.safe_run();
-}
-
-//TEST( Features2d_DescriptorExtractor_OpponentSIFT, regression )
-//{
-//    CV_DescriptorExtractorTest<L2<float> > test( "descriptor-opponent-sift", 0.18f,
-//                                                 DescriptorExtractor::create("OpponentSIFT"), 8.06652f  );
-//    test.safe_run();
-//}
-
-TEST( Features2d_DescriptorExtractor_OpponentSURF, regression )
-{
-    CV_DescriptorExtractorTest<L2<float> > test( "descriptor-opponent-surf",  0.18f,
-                                                 DescriptorExtractor::create("OpponentSURF"), 0.147372f );
     test.safe_run();
 }
 
@@ -1096,7 +1082,7 @@ TEST( Features2d_DescriptorExtractor_Calonder_float, regression )
  */
 TEST( Features2d_DescriptorMatcher_BruteForce, regression )
 {
-    CV_DescriptorMatcherTest test( "descriptor-matcher-brute-force", new BruteForceMatcher<L2<float> >, 0.01f );
+    CV_DescriptorMatcherTest test( "descriptor-matcher-brute-force", new BFMatcher(NORM_L2), 0.01f );
     test.safe_run();
 }
 

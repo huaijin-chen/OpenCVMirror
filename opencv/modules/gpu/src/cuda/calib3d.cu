@@ -42,11 +42,12 @@
 
 #include "internal_shared.hpp"
 #include "opencv2/gpu/device/transform.hpp"
+#include "opencv2/gpu/device/functional.hpp"
 
-#define SOLVE_PNP_RANSAC_MAX_NUM_ITERS 200
-
-namespace cv { namespace gpu
+namespace cv { namespace gpu { namespace device 
 {
+    #define SOLVE_PNP_RANSAC_MAX_NUM_ITERS 200
+
     namespace transform_points
     {
         __constant__ float3 crot0;
@@ -54,9 +55,9 @@ namespace cv { namespace gpu
         __constant__ float3 crot2;
         __constant__ float3 ctransl;
 
-        struct TransformOp
+        struct TransformOp : unary_function<float3, float3>
         {
-            __device__ __forceinline__ float3 operator()(float3 p) const
+            __device__ __forceinline__ float3 operator()(const float3& p) const
             {
                 return make_float3(
                         crot0.x * p.x + crot0.y * p.y + crot0.z * p.z + ctransl.x,
@@ -73,10 +74,9 @@ namespace cv { namespace gpu
             cudaSafeCall(cudaMemcpyToSymbol(crot1, rot + 3, sizeof(float) * 3));
             cudaSafeCall(cudaMemcpyToSymbol(crot2, rot + 6, sizeof(float) * 3));
             cudaSafeCall(cudaMemcpyToSymbol(ctransl, transl, sizeof(float) * 3));
-            transform(src, dst, TransformOp(), stream);
+            cv::gpu::device::transform(src, dst, TransformOp(), WithOutMask(), stream);
         }
     } // namespace transform_points
-
 
     namespace project_points
     {
@@ -87,9 +87,9 @@ namespace cv { namespace gpu
         __constant__ float3 cproj0;
         __constant__ float3 cproj1;
 
-        struct ProjectOp
+        struct ProjectOp : unary_function<float3, float3>
         {
-            __device__ __forceinline__ float2 operator()(float3 p) const
+            __device__ __forceinline__ float2 operator()(const float3& p) const
             {
                 // Rotate and translate in 3D
                 float3 t = make_float3(
@@ -113,10 +113,9 @@ namespace cv { namespace gpu
             cudaSafeCall(cudaMemcpyToSymbol(ctransl, transl, sizeof(float) * 3));
             cudaSafeCall(cudaMemcpyToSymbol(cproj0, proj, sizeof(float) * 3));
             cudaSafeCall(cudaMemcpyToSymbol(cproj1, proj + 3, sizeof(float) * 3));
-            transform(src, dst, ProjectOp(), stream);
+            cv::gpu::device::transform(src, dst, ProjectOp(), WithOutMask(), stream);
         }
     } // namespace project_points
-
 
     namespace solve_pnp_ransac
     {
@@ -189,5 +188,4 @@ namespace cv { namespace gpu
             cudaSafeCall( cudaDeviceSynchronize() );
         }
     } // namespace solvepnp_ransac
-
-}} // namespace cv { namespace gpu
+}}} // namespace cv { namespace gpu { namespace device

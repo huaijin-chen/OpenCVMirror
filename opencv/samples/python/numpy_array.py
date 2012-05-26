@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import urllib2
 import sys
-import cv
+import cv2.cv as cv
 import numpy
 
 # SRGB-linear conversions using NumPy - see http://en.wikipedia.org/wiki/SRGB
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         img0 = cv.LoadImageM( sys.argv[1], cv.CV_LOAD_IMAGE_COLOR)
     else:
-        url = 'https://code.ros.org/svn/opencv/trunk/opencv/samples/c/lena.jpg'
+        url = 'http://code.opencv.org/svn/opencv/trunk/opencv/samples/c/lena.jpg'
         filedata = urllib2.urlopen(url).read()
         imagefiledata = cv.CreateMatHeader(1, len(filedata), cv.CV_8UC1)
         cv.SetData(imagefiledata, filedata, len(filedata))
@@ -63,3 +63,4 @@ if __name__ == "__main__":
     cv.ShowImage("gaussian", cv.fromarray(n))
 
     cv.WaitKey(0)
+    cv.DestroyAllWindows()

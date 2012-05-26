@@ -23,6 +23,7 @@
 #define AVUTIL_PIXDESC_H
 
 #include <inttypes.h>
+#include "pixfmt.h"
 
 typedef struct AVComponentDescriptor{
     uint16_t plane        :2;            ///< which of the 4 planes contains the component
@@ -86,6 +87,8 @@ typedef struct AVPixFmtDescriptor{
 #define PIX_FMT_PAL       2 ///< Pixel format has a palette in data[1], values are indexes in this palette.
 #define PIX_FMT_BITSTREAM 4 ///< All values of a component are bit-wise packed end to end.
 #define PIX_FMT_HWACCEL   8 ///< Pixel format is an HW accelerated format.
+#define PIX_FMT_PLANAR   16 ///< At least one pixel component is not in the first data plane
+#define PIX_FMT_RGB      32 ///< The pixel format contains RGB-like data (as opposed to YUV/grayscale)
 
 /**
  * The array of all the pixel format descriptors.
@@ -93,11 +96,11 @@ typedef struct AVPixFmtDescriptor{
 extern const AVPixFmtDescriptor av_pix_fmt_descriptors[];
 
 /**
- * Reads a line from an image, and writes the values of the
+ * Read a line from an image, and write the values of the
  * pixel format component c to dst.
  *
  * @param data the array containing the pointers to the planes of the image
- * @param linesizes the array containing the linesizes of the image
+ * @param linesize the array containing the linesizes of the image
  * @param desc the pixel format descriptor for the image
  * @param x the horizontal coordinate of the first pixel to read
  * @param y the vertical coordinate of the first pixel to read
@@ -108,28 +111,28 @@ extern const AVPixFmtDescriptor av_pix_fmt_descriptors[];
  * component c in data[1] to dst, rather than the palette indexes in
  * data[0]. The behavior is undefined if the format is not paletted.
  */
-void read_line(uint16_t *dst, const uint8_t *data[4], const int linesize[4],
-               const AVPixFmtDescriptor *desc, int x, int y, int c, int w, int read_pal_component);
+void av_read_image_line(uint16_t *dst, const uint8_t *data[4], const int linesize[4],
+                        const AVPixFmtDescriptor *desc, int x, int y, int c, int w, int read_pal_component);
 
 /**
- * Writes the values from src to the pixel format component c of an
+ * Write the values from src to the pixel format component c of an
  * image line.
  *
  * @param src array containing the values to write
  * @param data the array containing the pointers to the planes of the
  * image to write into. It is supposed to be zeroed.
- * @param linesizes the array containing the linesizes of the image
+ * @param linesize the array containing the linesizes of the image
  * @param desc the pixel format descriptor for the image
  * @param x the horizontal coordinate of the first pixel to write
  * @param y the vertical coordinate of the first pixel to write
  * @param w the width of the line to write, that is the number of
  * values to write to the image line
  */
-void write_line(const uint16_t *src, uint8_t *data[4], const int linesize[4],
-                const AVPixFmtDescriptor *desc, int x, int y, int c, int w);
+void av_write_image_line(const uint16_t *src, uint8_t *data[4], const int linesize[4],
+                         const AVPixFmtDescriptor *desc, int x, int y, int c, int w);
 
 /**
- * Returns the pixel format corresponding to name.
+ * Return the pixel format corresponding to name.
  *
  * If there is no pixel format with name name, then looks for a
  * pixel format with the name corresponding to the native endian
@@ -142,7 +145,27 @@ void write_line(const uint16_t *src, uint8_t *data[4], const int linesize[4],
 enum PixelFormat av_get_pix_fmt(const char *name);
 
 /**
- * Returns the number of bits per pixel used by the pixel format
+ * Return the short name for a pixel format, NULL in case pix_fmt is
+ * unknown.
+ *
+ * @see av_get_pix_fmt(), av_get_pix_fmt_string()
+ */
+const char *av_get_pix_fmt_name(enum PixelFormat pix_fmt);
+
+/**
+ * Print in buf the string corresponding to the pixel format with
+ * number pix_fmt, or an header if pix_fmt is negative.
+ *
+ * @param buf the buffer where to write the string
+ * @param buf_size the size of buf
+ * @param pix_fmt the number of the pixel format to print the
+ * corresponding info string, or a negative value to print the
+ * corresponding header.
+ */
+char *av_get_pix_fmt_string (char *buf, int buf_size, enum PixelFormat pix_fmt);
+
+/**
+ * Return the number of bits per pixel used by the pixel format
  * described by pixdesc.
  *
  * The returned number of bits refers to the number of bits actually

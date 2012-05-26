@@ -43,204 +43,672 @@
 #ifndef __OPENCV_GPU_BORDER_INTERPOLATE_HPP__
 #define __OPENCV_GPU_BORDER_INTERPOLATE_HPP__
 
-#include "opencv2/gpu/device/saturate_cast.hpp"
-#include "opencv2/gpu/device/vecmath.hpp"
+#include "saturate_cast.hpp"
+#include "vec_traits.hpp"
+#include "vec_math.hpp"
 
-namespace cv { namespace gpu { namespace device
+namespace cv { namespace gpu { namespace device 
 {
-    struct BrdReflect101 
+    //////////////////////////////////////////////////////////////
+    // BrdConstant
+
+    template <typename D> struct BrdRowConstant
     {
-        explicit BrdReflect101(int len): last(len - 1) {}
+        typedef D result_type;
 
-        __device__ __forceinline__ int idx_low(int i) const
+        explicit __host__ __device__ __forceinline__ BrdRowConstant(int width_, const D& val_ = VecTraits<D>::all(0)) : width(width_), val(val_) {}
+
+        template <typename T> __device__ __forceinline__ D at_low(int x, const T* data) const 
         {
-            return abs(i);
+            return x >= 0 ? saturate_cast<D>(data[x]) : val;
         }
 
-        __device__ __forceinline__ int idx_high(int i) const 
+        template <typename T> __device__ __forceinline__ D at_high(int x, const T* data) const 
         {
-            return last - abs(last - i);
+            return x < width ? saturate_cast<D>(data[x]) : val;
         }
 
-        __device__ __forceinline__ int idx(int i) const
+        template <typename T> __device__ __forceinline__ D at(int x, const T* data) const 
         {
-            return idx_low(idx_high(i));
+            return (x >= 0 && x < width) ? saturate_cast<D>(data[x]) : val;
         }
 
-        bool is_range_safe(int mini, int maxi) const 
-        {
-            return -last <= mini && maxi <= 2 * last;
-        }
-
-    private:
-        int last;
+        const int width;
+        const D val;
     };
 
-
-    template <typename D>
-    struct BrdRowReflect101: BrdReflect101
+    template <typename D> struct BrdColConstant
     {
-        explicit BrdRowReflect101(int len): BrdReflect101(len) {}
+        typedef D result_type;
 
-        template <typename T>
-        __device__ __forceinline__ D at_low(int i, const T* data) const 
+        explicit __host__ __device__ __forceinline__ BrdColConstant(int height_, const D& val_ = VecTraits<D>::all(0)) : height(height_), val(val_) {}
+
+        template <typename T> __device__ __forceinline__ D at_low(int y, const T* data, size_t step) const 
         {
-            return saturate_cast<D>(data[idx_low(i)]);
+            return y >= 0 ? saturate_cast<D>(*(const T*)((const char*)data + y * step)) : val;
         }
 
-        template <typename T>
-        __device__ __forceinline__ D at_high(int i, const T* data) const 
+        template <typename T> __device__ __forceinline__ D at_high(int y, const T* data, size_t step) const 
         {
-            return saturate_cast<D>(data[idx_high(i)]);
+            return y < height ? saturate_cast<D>(*(const T*)((const char*)data + y * step)) : val;
         }
+
+        template <typename T> __device__ __forceinline__ D at(int y, const T* data, size_t step) const 
+        {
+            return (y >= 0 && y < height) ? saturate_cast<D>(*(const T*)((const char*)data + y * step)) : val;
+        }
+
+        const int height;
+        const D val;
     };
 
-
-    template <typename D>
-    struct BrdColReflect101: BrdReflect101
+    template <typename D> struct BrdConstant
     {
-        BrdColReflect101(int len, int step): BrdReflect101(len), step(step) {}
+        typedef D result_type;
 
-        template <typename T>
-        __device__ __forceinline__ D at_low(int i, const T* data) const 
+        __host__ __device__ __forceinline__ BrdConstant(int height_, int width_, const D& val_ = VecTraits<D>::all(0)) : height(height_), width(width_), val(val_) 
         {
-            return saturate_cast<D>(data[idx_low(i) * step]);
         }
 
-        template <typename T>
-        __device__ __forceinline__ D at_high(int i, const T* data) const 
+        template <typename T> __device__ __forceinline__ D at(int y, int x, const T* data, size_t step) const
         {
-            return saturate_cast<D>(data[idx_high(i) * step]);
+            return (x >= 0 && x < width && y >= 0 && y < height) ? saturate_cast<D>(((const T*)((const uchar*)data + y * step))[x]) : val;
         }
 
-    private:
-        int step;
+        template <typename Ptr2D> __device__ __forceinline__ D at(typename Ptr2D::index_type y, typename Ptr2D::index_type x, const Ptr2D& src) const
+        {
+            return (x >= 0 && x < width && y >= 0 && y < height) ? saturate_cast<D>(src(y, x)) : val;
+        }
+
+        const int height;
+        const int width;
+        const D val;
     };
 
+    //////////////////////////////////////////////////////////////
+    // BrdReplicate
 
-    struct BrdReplicate
+    template <typename D> struct BrdRowReplicate
     {
-        explicit BrdReplicate(int len): last(len - 1) {}
+        typedef D result_type;
 
-        __device__ __forceinline__ int idx_low(int i) const
+        explicit __host__ __device__ __forceinline__ BrdRowReplicate(int width) : last_col(width - 1) {}
+        template <typename U> __host__ __device__ __forceinline__ BrdRowReplicate(int width, U) : last_col(width - 1) {}
+
+        __device__ __forceinline__ int idx_col_low(int x) const
         {
-            return max(i, 0);
+            return ::max(x, 0);
         }
 
-        __device__ __forceinline__ int idx_high(int i) const 
+        __device__ __forceinline__ int idx_col_high(int x) const 
         {
-            return min(i, last);
+            return ::min(x, last_col);
         }
 
-        __device__ __forceinline__ int idx(int i) const
+        __device__ __forceinline__ int idx_col(int x) const
         {
-            return idx_low(idx_high(i));
+            return idx_col_low(idx_col_high(x));
         }
 
-        bool is_range_safe(int mini, int maxi) const 
+        template <typename T> __device__ __forceinline__ D at_low(int x, const T* data) const 
         {
-            return true;
+            return saturate_cast<D>(data[idx_col_low(x)]);
         }
 
-    private:
-        int last;
+        template <typename T> __device__ __forceinline__ D at_high(int x, const T* data) const 
+        {
+            return saturate_cast<D>(data[idx_col_high(x)]);
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int x, const T* data) const 
+        {
+            return saturate_cast<D>(data[idx_col(x)]);
+        }
+
+        const int last_col;
     };
 
-
-    template <typename D>
-    struct BrdRowReplicate: BrdReplicate
+    template <typename D> struct BrdColReplicate
     {
-        explicit BrdRowReplicate(int len): BrdReplicate(len) {}
+        typedef D result_type;
 
-        template <typename T>
-        __device__ __forceinline__ D at_low(int i, const T* data) const 
+        explicit __host__ __device__ __forceinline__ BrdColReplicate(int height) : last_row(height - 1) {}
+        template <typename U> __host__ __device__ __forceinline__ BrdColReplicate(int height, U) : last_row(height - 1) {}
+
+        __device__ __forceinline__ int idx_row_low(int y) const
         {
-            return saturate_cast<D>(data[idx_low(i)]);
+            return ::max(y, 0);
         }
 
-        template <typename T>
-        __device__ __forceinline__ D at_high(int i, const T* data) const 
+        __device__ __forceinline__ int idx_row_high(int y) const 
         {
-            return saturate_cast<D>(data[idx_high(i)]);
+            return ::min(y, last_row);
         }
+
+        __device__ __forceinline__ int idx_row(int y) const
+        {
+            return idx_row_low(idx_row_high(y));
+        }
+
+        template <typename T> __device__ __forceinline__ D at_low(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const T*)((const char*)data + idx_row_low(y) * step));
+        }
+
+        template <typename T> __device__ __forceinline__ D at_high(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const T*)((const char*)data + idx_row_high(y) * step));
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const T*)((const char*)data + idx_row(y) * step));
+        }
+
+        const int last_row;
     };
 
-
-    template <typename D>
-    struct BrdColReplicate: BrdReplicate
+    template <typename D> struct BrdReplicate
     {
-        BrdColReplicate(int len, int step): BrdReplicate(len), step(step) {}
+        typedef D result_type;
 
-        template <typename T>
-        __device__ __forceinline__ D at_low(int i, const T* data) const 
+        __host__ __device__ __forceinline__ BrdReplicate(int height, int width) : last_row(height - 1), last_col(width - 1) {}
+        template <typename U> __host__ __device__ __forceinline__ BrdReplicate(int height, int width, U) : last_row(height - 1), last_col(width - 1) {}
+
+        __device__ __forceinline__ int idx_row_low(int y) const
         {
-            return saturate_cast<D>(data[idx_low(i) * step]);
+            return ::max(y, 0);
         }
 
-        template <typename T>
-        __device__ __forceinline__ D at_high(int i, const T* data) const 
+        __device__ __forceinline__ int idx_row_high(int y) const 
         {
-            return saturate_cast<D>(data[idx_high(i) * step]);
+            return ::min(y, last_row);
         }
 
-    private:
-        int step;
+        __device__ __forceinline__ int idx_row(int y) const
+        {
+            return idx_row_low(idx_row_high(y));
+        }
+
+        __device__ __forceinline__ int idx_col_low(int x) const
+        {
+            return ::max(x, 0);
+        }
+
+        __device__ __forceinline__ int idx_col_high(int x) const 
+        {
+            return ::min(x, last_col);
+        }
+
+        __device__ __forceinline__ int idx_col(int x) const
+        {
+            return idx_col_low(idx_col_high(x));
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int y, int x, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(((const T*)((const char*)data + idx_row(y) * step))[idx_col(x)]);
+        }
+
+        template <typename Ptr2D> __device__ __forceinline__ D at(typename Ptr2D::index_type y, typename Ptr2D::index_type x, const Ptr2D& src) const 
+        {
+            return saturate_cast<D>(src(idx_row(y), idx_col(x)));
+        }
+
+        const int last_row;
+        const int last_col;
     };
 
-    template <typename D>
-    struct BrdRowConstant
+    //////////////////////////////////////////////////////////////
+    // BrdReflect101
+
+    template <typename D> struct BrdRowReflect101
     {
-        explicit BrdRowConstant(int len_, const D& val_ = VecTraits<D>::all(0)): len(len_), val(val_) {}
+        typedef D result_type;
 
-        template <typename T>
-        __device__ __forceinline__ D at_low(int i, const T* data) const 
+        explicit __host__ __device__ __forceinline__ BrdRowReflect101(int width) : last_col(width - 1) {}
+        template <typename U> __host__ __device__ __forceinline__ BrdRowReflect101(int width, U) : last_col(width - 1) {}
+
+        __device__ __forceinline__ int idx_col_low(int x) const
         {
-            return i >= 0 ? saturate_cast<D>(data[i]) : val;
+            return ::abs(x) % (last_col + 1);
         }
 
-        template <typename T>
-        __device__ __forceinline__ D at_high(int i, const T* data) const 
+        __device__ __forceinline__ int idx_col_high(int x) const 
         {
-            return i < len ? saturate_cast<D>(data[i]) : val;
+            return ::abs(last_col - ::abs(last_col - x)) % (last_col + 1);
         }
 
-        bool is_range_safe(int mini, int maxi) const 
+        __device__ __forceinline__ int idx_col(int x) const
         {
-            return true;
+            return idx_col_low(idx_col_high(x));
         }
 
-    private:
-        int len;
-        D val;
+        template <typename T> __device__ __forceinline__ D at_low(int x, const T* data) const 
+        {
+            return saturate_cast<D>(data[idx_col_low(x)]);
+        }
+
+        template <typename T> __device__ __forceinline__ D at_high(int x, const T* data) const 
+        {
+            return saturate_cast<D>(data[idx_col_high(x)]);
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int x, const T* data) const 
+        {
+            return saturate_cast<D>(data[idx_col(x)]);
+        }
+
+        const int last_col;
     };
 
-    template <typename D>
-    struct BrdColConstant
+    template <typename D> struct BrdColReflect101
     {
-        BrdColConstant(int len_, int step_, const D& val_ = VecTraits<D>::all(0)): len(len_), step(step_), val(val_) {}
+        typedef D result_type;
 
-        template <typename T>
-        __device__ __forceinline__ D at_low(int i, const T* data) const 
+        explicit __host__ __device__ __forceinline__ BrdColReflect101(int height) : last_row(height - 1) {}
+        template <typename U> __host__ __device__ __forceinline__ BrdColReflect101(int height, U) : last_row(height - 1) {}
+
+        __device__ __forceinline__ int idx_row_low(int y) const
         {
-            return i >= 0 ? saturate_cast<D>(data[i * step]) : val;
+            return ::abs(y) % (last_row + 1);
         }
 
-        template <typename T>
-        __device__ __forceinline__ D at_high(int i, const T* data) const 
+        __device__ __forceinline__ int idx_row_high(int y) const 
         {
-            return i < len ? saturate_cast<D>(data[i * step]) : val;
+            return ::abs(last_row - ::abs(last_row - y)) % (last_row + 1);
         }
 
-        bool is_range_safe(int mini, int maxi) const 
+        __device__ __forceinline__ int idx_row(int y) const
         {
-            return true;
+            return idx_row_low(idx_row_high(y));
         }
 
-    private:
-        int len;
-        int step;
-        D val;
+        template <typename T> __device__ __forceinline__ D at_low(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const D*)((const char*)data + idx_row_low(y) * step));
+        }
+
+        template <typename T> __device__ __forceinline__ D at_high(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const D*)((const char*)data + idx_row_high(y) * step));
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const D*)((const char*)data + idx_row(y) * step));
+        }
+
+        const int last_row;
     };
-}}}
+
+    template <typename D> struct BrdReflect101
+    {
+        typedef D result_type;
+
+        __host__ __device__ __forceinline__ BrdReflect101(int height, int width) : last_row(height - 1), last_col(width - 1) {}
+        template <typename U> __host__ __device__ __forceinline__ BrdReflect101(int height, int width, U) : last_row(height - 1), last_col(width - 1) {}
+
+        __device__ __forceinline__ int idx_row_low(int y) const
+        {
+            return ::abs(y) % (last_row + 1);
+        }
+
+        __device__ __forceinline__ int idx_row_high(int y) const 
+        {
+            return ::abs(last_row - ::abs(last_row - y)) % (last_row + 1);
+        }
+
+        __device__ __forceinline__ int idx_row(int y) const
+        {
+            return idx_row_low(idx_row_high(y));
+        }
+
+        __device__ __forceinline__ int idx_col_low(int x) const
+        {
+            return ::abs(x) % (last_col + 1);
+        }
+
+        __device__ __forceinline__ int idx_col_high(int x) const 
+        {
+            return ::abs(last_col - ::abs(last_col - x)) % (last_col + 1);
+        }
+
+        __device__ __forceinline__ int idx_col(int x) const
+        {
+            return idx_col_low(idx_col_high(x));
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int y, int x, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(((const T*)((const char*)data + idx_row(y) * step))[idx_col(x)]);
+        }
+
+        template <typename Ptr2D> __device__ __forceinline__ D at(typename Ptr2D::index_type y, typename Ptr2D::index_type x, const Ptr2D& src) const 
+        {
+            return saturate_cast<D>(src(idx_row(y), idx_col(x)));
+        }
+
+        const int last_row;
+        const int last_col;
+    };
+
+    //////////////////////////////////////////////////////////////
+    // BrdReflect
+
+    template <typename D> struct BrdRowReflect
+    {
+        typedef D result_type;
+
+        explicit __host__ __device__ __forceinline__ BrdRowReflect(int width) : last_col(width - 1) {}
+        template <typename U> __host__ __device__ __forceinline__ BrdRowReflect(int width, U) : last_col(width - 1) {}
+
+        __device__ __forceinline__ int idx_col_low(int x) const
+        {
+            return (::abs(x) - (x < 0)) % (last_col + 1);
+        }
+
+        __device__ __forceinline__ int idx_col_high(int x) const 
+        {
+            return ::abs(last_col - ::abs(last_col - x) + (x > last_col)) % (last_col + 1);
+        }
+
+        __device__ __forceinline__ int idx_col(int x) const
+        {  
+            return idx_col_high(::abs(x) - (x < 0));
+        }
+
+        template <typename T> __device__ __forceinline__ D at_low(int x, const T* data) const 
+        {
+            return saturate_cast<D>(data[idx_col_low(x)]);
+        }
+
+        template <typename T> __device__ __forceinline__ D at_high(int x, const T* data) const 
+        {
+            return saturate_cast<D>(data[idx_col_high(x)]);
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int x, const T* data) const 
+        {
+            return saturate_cast<D>(data[idx_col(x)]);
+        }
+
+        const int last_col;
+    };
+
+    template <typename D> struct BrdColReflect
+    {
+        typedef D result_type;
+
+        explicit __host__ __device__ __forceinline__ BrdColReflect(int height) : last_row(height - 1) {}
+        template <typename U> __host__ __device__ __forceinline__ BrdColReflect(int height, U) : last_row(height - 1) {}
+
+        __device__ __forceinline__ int idx_row_low(int y) const
+        {
+            return (::abs(y) - (y < 0)) % (last_row + 1);
+        }
+
+        __device__ __forceinline__ int idx_row_high(int y) const 
+        {
+            return ::abs(last_row - ::abs(last_row - y) + (y > last_row)) % (last_row + 1);
+        }
+
+        __device__ __forceinline__ int idx_row(int y) const
+        {
+            return idx_row_high(::abs(y) - (y < 0));
+        }
+
+        template <typename T> __device__ __forceinline__ D at_low(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const D*)((const char*)data + idx_row_low(y) * step));
+        }
+
+        template <typename T> __device__ __forceinline__ D at_high(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const D*)((const char*)data + idx_row_high(y) * step));
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const D*)((const char*)data + idx_row(y) * step));
+        }
+
+        const int last_row;
+    };
+
+    template <typename D> struct BrdReflect
+    {
+        typedef D result_type;
+
+        __host__ __device__ __forceinline__ BrdReflect(int height, int width) : last_row(height - 1), last_col(width - 1) {}
+        template <typename U> __host__ __device__ __forceinline__ BrdReflect(int height, int width, U) : last_row(height - 1), last_col(width - 1) {}
+
+        __device__ __forceinline__ int idx_row_low(int y) const
+        {
+            return (::abs(y) - (y < 0)) % (last_row + 1);
+        }
+
+        __device__ __forceinline__ int idx_row_high(int y) const 
+        {
+            return /*::abs*/(last_row - ::abs(last_row - y) + (y > last_row)) /*% (last_row + 1)*/;
+        }
+
+        __device__ __forceinline__ int idx_row(int y) const
+        {
+            return idx_row_low(idx_row_high(y));
+        }
+
+        __device__ __forceinline__ int idx_col_low(int x) const
+        {
+            return (::abs(x) - (x < 0)) % (last_col + 1);
+        }
+
+        __device__ __forceinline__ int idx_col_high(int x) const 
+        {
+            return (last_col - ::abs(last_col - x) + (x > last_col));
+        }
+
+        __device__ __forceinline__ int idx_col(int x) const
+        {
+            return idx_col_low(idx_col_high(x));
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int y, int x, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(((const T*)((const char*)data + idx_row(y) * step))[idx_col(x)]);
+        }
+
+        template <typename Ptr2D> __device__ __forceinline__ D at(typename Ptr2D::index_type y, typename Ptr2D::index_type x, const Ptr2D& src) const 
+        {
+            return saturate_cast<D>(src(idx_row(y), idx_col(x)));
+        }
+
+        const int last_row;
+        const int last_col;
+    };
+
+    //////////////////////////////////////////////////////////////
+    // BrdWrap
+
+    template <typename D> struct BrdRowWrap
+    {
+        typedef D result_type;
+
+        explicit __host__ __device__ __forceinline__ BrdRowWrap(int width_) : width(width_) {}
+        template <typename U> __host__ __device__ __forceinline__ BrdRowWrap(int width_, U) : width(width_) {}
+
+        __device__ __forceinline__ int idx_col_low(int x) const
+        {
+            return (x >= 0) * x + (x < 0) * (x - ((x - width + 1) / width) * width);
+        }
+
+        __device__ __forceinline__ int idx_col_high(int x) const 
+        {
+            return (x < width) * x + (x >= width) * (x % width);
+        }
+
+        __device__ __forceinline__ int idx_col(int x) const
+        {
+            return idx_col_high(idx_col_low(x));
+        }
+
+        template <typename T> __device__ __forceinline__ D at_low(int x, const T* data) const 
+        {
+            return saturate_cast<D>(data[idx_col_low(x)]);
+        }
+
+        template <typename T> __device__ __forceinline__ D at_high(int x, const T* data) const 
+        {
+            return saturate_cast<D>(data[idx_col_high(x)]);
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int x, const T* data) const 
+        {
+            return saturate_cast<D>(data[idx_col(x)]);
+        }
+
+        const int width;
+    };
+
+    template <typename D> struct BrdColWrap
+    {
+        typedef D result_type;
+
+        explicit __host__ __device__ __forceinline__ BrdColWrap(int height_) : height(height_) {}
+        template <typename U> __host__ __device__ __forceinline__ BrdColWrap(int height_, U) : height(height_) {}
+
+        __device__ __forceinline__ int idx_row_low(int y) const
+        {
+            return (y >= 0) * y + (y < 0) * (y - ((y - height + 1) / height) * height);
+        }
+
+        __device__ __forceinline__ int idx_row_high(int y) const 
+        {
+            return (y < height) * y + (y >= height) * (y % height);
+        }
+
+        __device__ __forceinline__ int idx_row(int y) const
+        {
+            return idx_row_high(idx_row_low(y));
+        }
+
+        template <typename T> __device__ __forceinline__ D at_low(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const D*)((const char*)data + idx_row_low(y) * step));
+        }
+
+        template <typename T> __device__ __forceinline__ D at_high(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const D*)((const char*)data + idx_row_high(y) * step));
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int y, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(*(const D*)((const char*)data + idx_row(y) * step));
+        }
+
+        const int height;
+    };
+
+    template <typename D> struct BrdWrap
+    {
+        typedef D result_type;
+
+        __host__ __device__ __forceinline__ BrdWrap(int height_, int width_) : 
+            height(height_), width(width_) 
+        {
+        }
+        template <typename U> 
+        __host__ __device__ __forceinline__ BrdWrap(int height_, int width_, U) : 
+            height(height_), width(width_) 
+        {
+        }
+
+        __device__ __forceinline__ int idx_row_low(int y) const
+        {
+            return (y >= 0) * y + (y < 0) * (y - ((y - height + 1) / height) * height);
+        }
+
+        __device__ __forceinline__ int idx_row_high(int y) const 
+        {
+            return (y < height) * y + (y >= height) * (y % height);
+        }
+
+        __device__ __forceinline__ int idx_row(int y) const
+        {
+            return idx_row_high(idx_row_low(y));
+        }
+
+        __device__ __forceinline__ int idx_col_low(int x) const
+        {
+            return (x >= 0) * x + (x < 0) * (x - ((x - width + 1) / width) * width);
+        }
+
+        __device__ __forceinline__ int idx_col_high(int x) const 
+        {
+            return (x < width) * x + (x >= width) * (x % width);
+        }
+
+        __device__ __forceinline__ int idx_col(int x) const
+        {
+            return idx_col_high(idx_col_low(x));
+        }
+
+        template <typename T> __device__ __forceinline__ D at(int y, int x, const T* data, size_t step) const 
+        {
+            return saturate_cast<D>(((const T*)((const char*)data + idx_row(y) * step))[idx_col(x)]);
+        }
+
+        template <typename Ptr2D> __device__ __forceinline__ D at(typename Ptr2D::index_type y, typename Ptr2D::index_type x, const Ptr2D& src) const 
+        {
+            return saturate_cast<D>(src(idx_row(y), idx_col(x)));
+        }
+
+        const int height;
+        const int width;
+    };
+
+    //////////////////////////////////////////////////////////////
+    // BorderReader
+
+    template <typename Ptr2D, typename B> struct BorderReader
+    {
+        typedef typename B::result_type elem_type;
+        typedef typename Ptr2D::index_type index_type;
+
+        __host__ __device__ __forceinline__ BorderReader(const Ptr2D& ptr_, const B& b_) : ptr(ptr_), b(b_) {}
+
+        __device__ __forceinline__ elem_type operator ()(index_type y, index_type x) const
+        {
+            return b.at(y, x, ptr);
+        }
+
+        const Ptr2D ptr;
+        const B b;
+    };
+
+    // under win32 there is some bug with templated types that passed as kernel parameters
+    // with this specialization all works fine
+    template <typename Ptr2D, typename D> struct BorderReader< Ptr2D, BrdConstant<D> >
+    {
+        typedef typename BrdConstant<D>::result_type elem_type;
+        typedef typename Ptr2D::index_type index_type;
+
+        __host__ __device__ __forceinline__ BorderReader(const Ptr2D& src_, const BrdConstant<D>& b) : 
+            src(src_), height(b.height), width(b.width), val(b.val) 
+        {
+        }
+
+        __device__ __forceinline__ D operator ()(index_type y, index_type x) const
+        {
+            return (x >= 0 && x < width && y >= 0 && y < height) ? saturate_cast<D>(src(y, x)) : val;
+        }
+
+        const Ptr2D src;
+        const int height;
+        const int width;
+        const D val;
+    };
+}}} // namespace cv { namespace gpu { namespace device
 
 #endif // __OPENCV_GPU_BORDER_INTERPOLATE_HPP__

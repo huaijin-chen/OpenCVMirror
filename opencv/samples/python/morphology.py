@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import sys
 import urllib2
-import cv
+import cv2.cv as cv
 
 src = 0
 image = 0
@@ -31,7 +31,7 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         src = cv.LoadImage(sys.argv[1], cv.CV_LOAD_IMAGE_COLOR)
     else:
-        url = 'https://code.ros.org/svn/opencv/trunk/opencv/samples/c/fruits.jpg'
+        url = 'http://code.opencv.org/svn/opencv/trunk/opencv/samples/c/fruits.jpg'
         filedata = urllib2.urlopen(url).read()
         imagefiledata = cv.CreateMatHeader(1, len(filedata), cv.CV_8UC1)
         cv.SetData(imagefiledata, filedata, len(filedata))

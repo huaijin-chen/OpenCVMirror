@@ -61,6 +61,7 @@
 #include <new>
 #include <string>
 #include <vector>
+#include <sstream>
 #endif // SKIP_INCLUDES
 
 /*! \namespace cv
@@ -90,6 +91,15 @@ class Mat;
 class SparseMat;
 typedef Mat MatND;
 
+class GlBuffer;
+class GlTexture;
+class GlArrays;
+class GlCamera;
+
+namespace gpu {
+    class GpuMat;
+}
+
 class CV_EXPORTS MatExpr;
 class CV_EXPORTS MatOp_Base;
 class CV_EXPORTS MatArg;
@@ -108,7 +118,7 @@ CV_EXPORTS string tempfile( const char* suffix CV_DEFAULT(0));
     
 // matrix decomposition types
 enum { DECOMP_LU=0, DECOMP_SVD=1, DECOMP_EIG=2, DECOMP_CHOLESKY=3, DECOMP_QR=4, DECOMP_NORMAL=16 };
-enum { NORM_INF=1, NORM_L1=2, NORM_L2=4, NORM_TYPE_MASK=7, NORM_RELATIVE=8, NORM_MINMAX=32};
+enum { NORM_INF=1, NORM_L1=2, NORM_L2=4, NORM_L2SQR=5, NORM_HAMMING=6, NORM_HAMMING2=7, NORM_TYPE_MASK=7, NORM_RELATIVE=8, NORM_MINMAX=32 };
 enum { CMP_EQ=0, CMP_GT=1, CMP_GE=2, CMP_LT=3, CMP_LE=4, CMP_NE=5 };
 enum { GEMM_1_T=1, GEMM_2_T=2, GEMM_3_T=4 };
 enum { DFT_INVERSE=1, DFT_SCALE=2, DFT_ROWS=4, DFT_COMPLEX_OUTPUT=16, DFT_REAL_OUTPUT=32,
@@ -208,6 +218,8 @@ CV_EXPORTS void setNumThreads(int nthreads);
 CV_EXPORTS int getNumThreads();
 CV_EXPORTS int getThreadNum();
 
+CV_EXPORTS_W const std::string& getBuildInformation();
+
 //! Returns the number of ticks.
 
 /*!
@@ -216,7 +228,7 @@ CV_EXPORTS int getThreadNum();
   before and after the function call. The granularity of ticks depends on the hardware and OS used. Use
   cv::getTickFrequency() to convert ticks to seconds.
 */
-CV_EXPORTS int64 getTickCount();
+CV_EXPORTS_W int64 getTickCount();
 
 /*!
   Returns the number of ticks per seconds.
@@ -240,7 +252,7 @@ CV_EXPORTS_W double getTickFrequency();
   one can accurately measure the execution time of very small code fragments,
   for which cv::getTickCount() granularity is not enough.
 */
-CV_EXPORTS int64 getCPUTickCount();
+CV_EXPORTS_W int64 getCPUTickCount();
 
 /*!
   Returns SSE etc. support status
@@ -263,6 +275,9 @@ CV_EXPORTS int64 getCPUTickCount();
 */
 CV_EXPORTS_W bool checkHardwareSupport(int feature);
 
+//! returns the number of CPUs (including hyper-threading)
+CV_EXPORTS_W int getNumberOfCPUs();
+    
 /*!
   Allocates memory buffer
   
@@ -479,7 +494,7 @@ public:
     Matx<_Tp, m, 1> col(int i) const;
     
     //! extract the matrix diagonal
-    Matx<_Tp, MIN(m,n), 1> diag() const;
+    diag_type diag() const;
     
     //! transpose the matrix
     Matx<_Tp, n, m> t() const;
@@ -489,7 +504,7 @@ public:
     
     //! solve linear system
     template<int l> Matx<_Tp, n, l> solve(const Matx<_Tp, m, l>& rhs, int flags=DECOMP_LU) const;
-    Matx<_Tp, n, 1> solve(const Matx<_Tp, m, 1>& rhs, int method) const;
+    Vec<_Tp, n> solve(const Vec<_Tp, m>& rhs, int method) const;
     
     //! multiply two matrices element-wise
     Matx<_Tp, m, n> mul(const Matx<_Tp, m, n>& a) const;
@@ -589,10 +604,14 @@ public:
     explicit Vec(const _Tp* values);
 
     Vec(const Vec<_Tp, cn>& v);
+    
     static Vec all(_Tp alpha);
 
     //! per-element multiplication
     Vec mul(const Vec<_Tp, cn>& v) const;
+    
+    //! conjugation (makes sense for complex numbers and quaternions)
+    Vec conj() const;
     
     /*!
       cross product of the two 3D vectors.
@@ -610,6 +629,10 @@ public:
     _Tp& operator[](int i);
     const _Tp& operator ()(int i) const;
     _Tp& operator ()(int i);
+    
+    Vec(const Matx<_Tp, cn, 1>& a, const Matx<_Tp, cn, 1>& b, Matx_AddOp);
+    Vec(const Matx<_Tp, cn, 1>& a, const Matx<_Tp, cn, 1>& b, Matx_SubOp);
+    template<typename _T2> Vec(const Matx<_Tp, cn, 1>& a, _T2 alpha, Matx_ScaleOp);
 };
 
 
@@ -718,6 +741,8 @@ public:
     _Tp dot(const Point_& pt) const;
     //! dot product computed in double-precision arithmetics
     double ddot(const Point_& pt) const;
+    //! cross-product
+    double cross(const Point_& pt) const;
     //! checks whether the point is inside the specified rectangle
     bool inside(const Rect_<_Tp>& r) const;
     
@@ -967,7 +992,6 @@ public:
     typedef value_type work_type;
     typedef value_type channel_type;
     typedef value_type vec_type;
-    
     enum { generic_type = 1, depth = -1, channels = 1, fmt=0,
         type = CV_MAKETYPE(depth, channels) };
 };
@@ -1187,7 +1211,6 @@ public:
            type = CV_MAKETYPE(depth, channels) };
     typedef Vec<channel_type, channels> vec_type;
 };
-
     
 //////////////////// generic_type ref-counting pointer class for C/C++ objects ////////////////////////
 
@@ -1234,6 +1257,9 @@ public:
     //! returns true iff obj==NULL
     bool empty() const;
 
+    //! cast pointer to another type
+    template<typename _Tp2> Ptr<_Tp2> ptr();
+    template<typename _Tp2> const Ptr<_Tp2> ptr() const;
     
     //! helper operators making "Ptr<T> ptr" use very similar to "T* ptr".
     _Tp* operator -> ();
@@ -1242,7 +1268,6 @@ public:
     operator _Tp* ();
     operator const _Tp*() const;
     
-protected:
     _Tp* obj; //< the object pointer.
     int* refcount; //< the associated reference counter
 };
@@ -1256,20 +1281,45 @@ protected:
 class CV_EXPORTS _InputArray
 {
 public:
-    enum { KIND_SHIFT=16, NONE=0<<KIND_SHIFT, MAT=1<<KIND_SHIFT,
-        MATX=2<<KIND_SHIFT, STD_VECTOR=3<<KIND_SHIFT,
-        STD_VECTOR_VECTOR=4<<KIND_SHIFT,
-        STD_VECTOR_MAT=5<<KIND_SHIFT, EXPR=6<<KIND_SHIFT };
+    enum { 
+        KIND_SHIFT = 16,
+        FIXED_TYPE = 0x8000 << KIND_SHIFT,
+        FIXED_SIZE = 0x4000 << KIND_SHIFT,
+        KIND_MASK = ~(FIXED_TYPE|FIXED_SIZE) - (1 << KIND_SHIFT) + 1,
+
+        NONE              = 0 << KIND_SHIFT, 
+        MAT               = 1 << KIND_SHIFT,
+        MATX              = 2 << KIND_SHIFT, 
+        STD_VECTOR        = 3 << KIND_SHIFT,
+        STD_VECTOR_VECTOR = 4 << KIND_SHIFT,
+        STD_VECTOR_MAT    = 5 << KIND_SHIFT, 
+        EXPR              = 6 << KIND_SHIFT, 
+        OPENGL_BUFFER     = 7 << KIND_SHIFT, 
+        OPENGL_TEXTURE    = 8 << KIND_SHIFT, 
+        GPU_MAT           = 9 << KIND_SHIFT
+    };
     _InputArray();
     _InputArray(const Mat& m);
     _InputArray(const MatExpr& expr);
+    template<typename _Tp> _InputArray(const _Tp* vec, int n);
     template<typename _Tp> _InputArray(const vector<_Tp>& vec);
     template<typename _Tp> _InputArray(const vector<vector<_Tp> >& vec);
     _InputArray(const vector<Mat>& vec);
+    template<typename _Tp> _InputArray(const vector<Mat_<_Tp> >& vec);
+    template<typename _Tp> _InputArray(const Mat_<_Tp>& m);
     template<typename _Tp, int m, int n> _InputArray(const Matx<_Tp, m, n>& matx);
+    _InputArray(const Scalar& s);
     _InputArray(const double& val);
+    _InputArray(const GlBuffer& buf);
+    _InputArray(const GlTexture& tex);
+    _InputArray(const gpu::GpuMat& d_mat);
+
     virtual Mat getMat(int i=-1) const;
     virtual void getMatVector(vector<Mat>& mv) const;
+    virtual GlBuffer getGlBuffer() const;
+    virtual GlTexture getGlTexture() const;
+    virtual gpu::GpuMat getGpuMat() const;
+
     virtual int kind() const;
     virtual Size size(int i=-1) const;
     virtual size_t total(int i=-1) const;
@@ -1306,16 +1356,30 @@ class CV_EXPORTS _OutputArray : public _InputArray
 {
 public:
     _OutputArray();
+
     _OutputArray(Mat& m);
     template<typename _Tp> _OutputArray(vector<_Tp>& vec);
     template<typename _Tp> _OutputArray(vector<vector<_Tp> >& vec);
     _OutputArray(vector<Mat>& vec);
+    template<typename _Tp> _OutputArray(vector<Mat_<_Tp> >& vec);
+    template<typename _Tp> _OutputArray(Mat_<_Tp>& m);
     template<typename _Tp, int m, int n> _OutputArray(Matx<_Tp, m, n>& matx);
+    template<typename _Tp> _OutputArray(_Tp* vec, int n);
+
+    _OutputArray(const Mat& m);
+    template<typename _Tp> _OutputArray(const vector<_Tp>& vec);
+    template<typename _Tp> _OutputArray(const vector<vector<_Tp> >& vec);
+    _OutputArray(const vector<Mat>& vec);
+    template<typename _Tp> _OutputArray(const vector<Mat_<_Tp> >& vec);
+    template<typename _Tp> _OutputArray(const Mat_<_Tp>& m);
+    template<typename _Tp, int m, int n> _OutputArray(const Matx<_Tp, m, n>& matx);
+    template<typename _Tp> _OutputArray(const _Tp* vec, int n);
+
     virtual bool fixedSize() const;
     virtual bool fixedType() const;
     virtual bool needed() const;
     virtual Mat& getMatRef(int i=-1) const;
-    virtual void create(Size sz, int type, int i=-1, bool allocateVector=false, int fixedDepthMask=0) const;
+    virtual void create(Size sz, int type, int i=-1, bool allowTransposed=false, int fixedDepthMask=0) const;
     virtual void create(int rows, int cols, int type, int i=-1, bool allowTransposed=false, int fixedDepthMask=0) const;
     virtual void create(int dims, const int* size, int type, int i=-1, bool allowTransposed=false, int fixedDepthMask=0) const;
     virtual void release() const;
@@ -1327,6 +1391,7 @@ typedef InputArray InputArrayOfArrays;
 typedef const _OutputArray& OutputArray;
 typedef OutputArray OutputArrayOfArrays;
 typedef OutputArray InputOutputArray;
+typedef OutputArray InputOutputArrayOfArrays;
 
 CV_EXPORTS OutputArray noArray();
 
@@ -1610,6 +1675,10 @@ public:
     template<typename _Tp> explicit Mat(const Point3_<_Tp>& pt, bool copyData=true);
     //! builds matrix from comma initializer
     template<typename _Tp> explicit Mat(const MatCommaInitializer_<_Tp>& commaInitializer);
+
+    //! download data from GpuMat
+    explicit Mat(const gpu::GpuMat& m);
+
     //! destructor - calls release()
     ~Mat();
     //! assignment operators
@@ -1880,6 +1949,9 @@ public:
     
     MSize size;
     MStep step;
+    
+protected:
+    void initEmpty();
 };
 
 
@@ -1915,7 +1987,7 @@ public:
     float uniform(float a, float b);
     //! returns uniformly distributed double-precision floating-point random number from [a,b) range
     double uniform(double a, double b);
-    void fill( InputOutputArray mat, int distType, InputArray a, InputArray b );
+    void fill( InputOutputArray mat, int distType, InputArray a, InputArray b, bool saturateRange=false );
     //! returns Gaussian random variate with mean zero.
     double gaussian(double sigma);
 
@@ -1951,6 +2023,15 @@ public:
 };
 
     
+typedef void (*BinaryFunc)(const uchar* src1, size_t step1,
+                           const uchar* src2, size_t step2,
+                           uchar* dst, size_t step, Size sz,
+                           void*);
+
+CV_EXPORTS BinaryFunc getConvertFunc(int sdepth, int ddepth);
+CV_EXPORTS BinaryFunc getConvertScaleFunc(int sdepth, int ddepth);
+CV_EXPORTS BinaryFunc getCopyMaskFunc(size_t esz);    
+    
 //! swaps two matrices
 CV_EXPORTS void swap(Mat& a, Mat& b);
     
@@ -1961,7 +2042,7 @@ CV_EXPORTS Mat cvarrToMat(const CvArr* arr, bool copyData=false,
 CV_EXPORTS void extractImageCOI(const CvArr* arr, OutputArray coiimg, int coi=-1);
 //! inserts single-channel cv::Mat into a multi-channel CvMat or IplImage
 CV_EXPORTS void insertImageCOI(InputArray coiimg, CvArr* arr, int coi=-1);  
-    
+
 //! adds one matrix to another (dst = src1 + src2)
 CV_EXPORTS_W void add(InputArray src1, InputArray src2, OutputArray dst,
                       InputArray mask=noArray(), int dtype=-1);
@@ -2009,6 +2090,14 @@ CV_EXPORTS_W double norm(InputArray src1, int normType=NORM_L2, InputArray mask=
 //! computes norm of selected part of the difference between two arrays
 CV_EXPORTS_W double norm(InputArray src1, InputArray src2,
                          int normType=NORM_L2, InputArray mask=noArray());
+
+//! naive nearest neighbor finder
+CV_EXPORTS_W void batchDistance(InputArray src1, InputArray src2,
+                                OutputArray dist, int dtype, OutputArray nidx,
+                                int normType=NORM_L2, int K=0,
+                                InputArray mask=noArray(), int update=0,
+                                bool crosscheck=false);
+
 //! scales and shifts array elements so that either the specified norm (alpha) or the minimum (alpha) and maximum (beta) array values get the specified values 
 CV_EXPORTS_W void normalize( InputArray src, OutputArray dst, double alpha=1, double beta=0,
                              int norm_type=NORM_L2, int dtype=-1, InputArray mask=noArray());
@@ -2026,19 +2115,27 @@ CV_EXPORTS_W void reduce(InputArray src, OutputArray dst, int dim, int rtype, in
 //! makes multi-channel array out of several single-channel arrays
 CV_EXPORTS void merge(const Mat* mv, size_t count, OutputArray dst);
 //! makes multi-channel array out of several single-channel arrays
-CV_EXPORTS_W void merge(const vector<Mat>& mv, OutputArray dst);
+CV_EXPORTS_W void merge(InputArrayOfArrays mv, OutputArray dst);
     
 //! copies each plane of a multi-channel array to a dedicated array
 CV_EXPORTS void split(const Mat& src, Mat* mvbegin);
 //! copies each plane of a multi-channel array to a dedicated array
-CV_EXPORTS_W void split(const Mat& m, vector<Mat>& mv);
+CV_EXPORTS_W void split(InputArray m, OutputArrayOfArrays mv);
     
 //! copies selected channels from the input arrays to the selected channels of the output arrays
 CV_EXPORTS void mixChannels(const Mat* src, size_t nsrcs, Mat* dst, size_t ndsts,
                             const int* fromTo, size_t npairs);
 CV_EXPORTS void mixChannels(const vector<Mat>& src, vector<Mat>& dst,
                             const int* fromTo, size_t npairs);
+CV_EXPORTS_W void mixChannels(InputArrayOfArrays src, InputArrayOfArrays dst,
+                              const vector<int>& fromTo);
 
+//! extracts a single channel from src (coi is 0-based index)
+CV_EXPORTS_W void extractChannel(InputArray src, OutputArray dst, int coi);
+
+//! inserts a single channel to dst (coi is 0-based index)
+CV_EXPORTS_W void insertChannel(InputArray src, InputOutputArray dst, int coi);
+    
 //! reverses the order of the rows, columns or both in a matrix
 CV_EXPORTS_W void flip(InputArray src, OutputArray dst, int flipCode);
 
@@ -2048,11 +2145,11 @@ CV_EXPORTS Mat repeat(const Mat& src, int ny, int nx);
         
 CV_EXPORTS void hconcat(const Mat* src, size_t nsrc, OutputArray dst);
 CV_EXPORTS void hconcat(InputArray src1, InputArray src2, OutputArray dst);
-CV_EXPORTS_W void hconcat(InputArray src, OutputArray dst);
+CV_EXPORTS_W void hconcat(InputArrayOfArrays src, OutputArray dst);
 
 CV_EXPORTS void vconcat(const Mat* src, size_t nsrc, OutputArray dst);
 CV_EXPORTS void vconcat(InputArray src1, InputArray src2, OutputArray dst);
-CV_EXPORTS_W void vconcat(InputArray src, OutputArray dst);
+CV_EXPORTS_W void vconcat(InputArrayOfArrays src, OutputArray dst);
     
 //! computes bitwise conjunction of the two arrays (dst = src1 & src2)
 CV_EXPORTS_W void bitwise_and(InputArray src1, InputArray src2,
@@ -2099,6 +2196,12 @@ CV_EXPORTS_W void log(InputArray src, OutputArray dst);
 CV_EXPORTS_W float cubeRoot(float val);
 //! computes the angle in degrees (0..360) of the vector (x,y)
 CV_EXPORTS_W float fastAtan2(float y, float x);
+
+CV_EXPORTS void exp(const float* src, float* dst, int n);
+CV_EXPORTS void log(const float* src, float* dst, int n);
+CV_EXPORTS void fastAtan2(const float* y, const float* x, float* dst, int n, bool angleInDegrees);
+CV_EXPORTS void magnitude(const float* x, const float* y, float* dst, int n);    
+    
 //! converts polar coordinates to Cartesian
 CV_EXPORTS_W void polarToCart(InputArray magnitude, InputArray angle,
                               OutputArray x, OutputArray y, bool angleInDegrees=false);
@@ -2112,8 +2215,11 @@ CV_EXPORTS_W void phase(InputArray x, InputArray y, OutputArray angle,
 //! computes magnitude (magnitude(i)) of each (x(i), y(i)) vector
 CV_EXPORTS_W void magnitude(InputArray x, InputArray y, OutputArray magnitude);
 //! checks that each matrix element is within the specified range.
-CV_EXPORTS_W bool checkRange(InputArray a, bool quiet=true, CV_OUT Point* pt=0,
+CV_EXPORTS_W bool checkRange(InputArray a, bool quiet=true, CV_OUT Point* pos=0,
                             double minVal=-DBL_MAX, double maxVal=DBL_MAX);
+//! converts NaN's to the given number
+CV_EXPORTS_W void patchNaNs(InputOutputArray a, double val=0);
+    
 //! implements generalized matrix product algorithm GEMM from BLAS
 CV_EXPORTS_W void gemm(InputArray src1, InputArray src2, double alpha,
                        InputArray src3, double gamma, OutputArray dst, int flags=0);
@@ -2141,6 +2247,15 @@ CV_EXPORTS_W double invert(InputArray src, OutputArray dst, int flags=DECOMP_LU)
 //! solves linear system or a least-square problem
 CV_EXPORTS_W bool solve(InputArray src1, InputArray src2,
                         OutputArray dst, int flags=DECOMP_LU);
+
+enum
+{
+	SORT_EVERY_ROW=0,
+	SORT_EVERY_COLUMN=1,
+	SORT_ASCENDING=0,
+	SORT_DESCENDING=16
+};
+
 //! sorts independently each matrix row or each matrix column
 CV_EXPORTS_W void sort(InputArray src, OutputArray dst, int flags);
 //! sorts independently each matrix row or each matrix column
@@ -2156,6 +2271,19 @@ CV_EXPORTS bool eigen(InputArray src, OutputArray eigenvalues, int lowindex=-1,
 CV_EXPORTS bool eigen(InputArray src, OutputArray eigenvalues,
                       OutputArray eigenvectors,
                       int lowindex=-1, int highindex=-1);
+CV_EXPORTS_W bool eigen(InputArray src, bool computeEigenvectors,
+                        OutputArray eigenvalues, OutputArray eigenvectors);
+
+enum
+{
+	COVAR_SCRAMBLED=0,
+	COVAR_NORMAL=1,
+	COVAR_USE_AVG=2,
+	COVAR_SCALE=4,
+	COVAR_ROWS=8,
+	COVAR_COLS=16
+};
+
 //! computes covariation matrix of a set of samples
 CV_EXPORTS void calcCovarMatrix( const Mat* samples, int nsamples, Mat& covar, Mat& mean,
                                  int flags, int ctype=CV_64F);
@@ -2240,6 +2368,16 @@ public:
     Mat mean; //!< mean value subtracted before the projection and added after the back projection
 };
 
+CV_EXPORTS_W void PCACompute(InputArray data, CV_OUT InputOutputArray mean,
+                             OutputArray eigenvectors, int maxComponents=0);
+    
+CV_EXPORTS_W void PCAProject(InputArray data, InputArray mean,
+                             InputArray eigenvectors, OutputArray result);
+
+CV_EXPORTS_W void PCABackProject(InputArray data, InputArray mean,
+                                 InputArray eigenvectors, OutputArray result);
+
+
 /*!
     Singular Value Decomposition class
  
@@ -2289,6 +2427,14 @@ public:
     Mat u, w, vt;
 };
 
+//! computes SVD of src
+CV_EXPORTS_W void SVDecomp( InputArray src, CV_OUT OutputArray w,
+    CV_OUT OutputArray u, CV_OUT OutputArray vt, int flags=0 );
+
+//! performs back substitution for the previously computed SVD
+CV_EXPORTS_W void SVBackSubst( InputArray w, InputArray u, InputArray vt,
+                               InputArray rhs, CV_OUT OutputArray dst );
+
 //! computes Mahalanobis distance between two vectors: sqrt((v1-v2)'*icovar*(v1-v2)), where icovar is the inverse covariation matrix
 CV_EXPORTS_W double Mahalanobis(InputArray v1, InputArray v2, InputArray icovar);
 //! a synonym for Mahalanobis
@@ -2336,6 +2482,7 @@ CV_EXPORTS_W void randn(InputOutputArray dst, InputArray mean, InputArray stddev
 
 //! shuffles the input array elements
 CV_EXPORTS void randShuffle(InputOutputArray dst, double iterFactor=1., RNG* rng=0);
+CV_EXPORTS_AS(randShuffle) void randShuffle_(InputOutputArray dst, double iterFactor=1.);
 
 //! draws the line segment (pt1, pt2) in the image
 CV_EXPORTS_W void line(Mat& img, Point pt1, Point pt2, const Scalar& color,
@@ -2370,6 +2517,9 @@ CV_EXPORTS_W void ellipse(Mat& img, const RotatedRect& box, const Scalar& color,
 CV_EXPORTS void fillConvexPoly(Mat& img, const Point* pts, int npts,
                                const Scalar& color, int lineType=8,
                                int shift=0);
+CV_EXPORTS_W void fillConvexPoly(InputOutputArray img, InputArray points,
+                                 const Scalar& color, int lineType=8,
+                                 int shift=0);
 
 //! fills an area bounded by one or more polygons
 CV_EXPORTS void fillPoly(Mat& img, const Point** pts,
@@ -2377,16 +2527,24 @@ CV_EXPORTS void fillPoly(Mat& img, const Point** pts,
                          const Scalar& color, int lineType=8, int shift=0,
                          Point offset=Point() );
 
+CV_EXPORTS_W void fillPoly(InputOutputArray img, InputArrayOfArrays pts,
+                           const Scalar& color, int lineType=8, int shift=0,
+                           Point offset=Point() );
+
 //! draws one or more polygonal curves
 CV_EXPORTS void polylines(Mat& img, const Point** pts, const int* npts,
                           int ncontours, bool isClosed, const Scalar& color,
                           int thickness=1, int lineType=8, int shift=0 );
 
+CV_EXPORTS_W void polylines(InputOutputArray img, InputArrayOfArrays pts,
+                            bool isClosed, const Scalar& color,
+                            int thickness=1, int lineType=8, int shift=0 );
+
 //! clips the line segment by the rectangle Rect(0, 0, imgSize.width, imgSize.height)
 CV_EXPORTS bool clipLine(Size imgSize, CV_IN_OUT Point& pt1, CV_IN_OUT Point& pt2);
 
 //! clips the line segment by the rectangle imgRect
-CV_EXPORTS_W bool clipLine(Rect imgRect, CV_IN_OUT Point& pt1, CV_IN_OUT Point& pt2);
+CV_EXPORTS_W bool clipLine(Rect imgRect, CV_OUT CV_IN_OUT Point& pt1, CV_OUT CV_IN_OUT Point& pt2);
 
 /*!
    Line iterator class
@@ -2438,7 +2596,7 @@ enum
 //! renders text string in the image
 CV_EXPORTS_W void putText( Mat& img, const string& text, Point org,
                          int fontFace, double fontScale, Scalar color,
-                         int thickness=1, int linetype=8,
+                         int thickness=1, int lineType=8,
                          bool bottomLeftOrigin=false );
 
 //! returns bounding box of the text string
@@ -2529,6 +2687,8 @@ public:
     Mat_(const Mat_& m, const Rect& roi);
     //! selects a submatrix, n-dim version
     Mat_(const Mat_& m, const Range* ranges);
+    //! from a matrix expression
+    explicit Mat_(const MatExpr& e);
     //! makes a matrix out of Vec, std::vector, Point_ or Point3_. The matrix will have a single column
     explicit Mat_(const vector<_Tp>& vec, bool copyData=false);
     template<int n> explicit Mat_(const Vec<typename DataType<_Tp>::channel_type, n>& vec, bool copyData=true);
@@ -2541,6 +2701,8 @@ public:
     Mat_& operator = (const Mat_& m);
     //! set all the elements to s.
     Mat_& operator = (const _Tp& s);
+    //! assign a matrix expression
+    Mat_& operator = (const MatExpr& e);
 
     //! iterators; they are smart enough to skip gaps in the end of rows
     iterator begin();
@@ -2556,8 +2718,6 @@ public:
     void create(int _ndims, const int* _sizes);
     //! cross-product
     Mat_ cross(const Mat_& m) const;
-    //! to support complex matrix expressions
-    Mat_& operator = (const MatExpr& expr);
     //! data type conversion
     template<typename T2> operator Mat_<T2>() const;
     //! overridden forms of Mat::row() etc.
@@ -2587,7 +2747,6 @@ public:
     static MatExpr eye(Size size);
 
     //! some more overriden methods
-    Mat_ reshape(int _rows) const;
     Mat_& adjustROI( int dtop, int dbottom, int dleft, int dright );
     Mat_ operator()( const Range& rowRange, const Range& colRange ) const;
     Mat_ operator()( const Rect& roi ) const;
@@ -4110,127 +4269,311 @@ public:
 };
 
 
-#if 0
-class CV_EXPORTS AlgorithmImpl;
-
+class CV_EXPORTS Algorithm;
+class CV_EXPORTS AlgorithmInfo;
+struct CV_EXPORTS AlgorithmInfoData;
+    
+template<typename _Tp> struct ParamType {};
+    
 /*!
   Base class for high-level OpenCV algorithms
 */    
-class CV_EXPORTS Algorithm
+class CV_EXPORTS_W Algorithm
 {
 public:
+    Algorithm();
     virtual ~Algorithm();
-    virtual string name() const;
+    string name() const;
     
-    template<typename _Tp> _Tp get(int paramId) const;
-    template<typename _Tp> bool set(int paramId, const _Tp& value);
-    string paramName(int paramId) const;
-    string paramHelp(int paramId) const;
-    int paramType(int paramId) const;
-    int findParam(const string& name) const;
-    template<typename _Tp> _Tp paramDefaultValue(int paramId) const;
-    template<typename _Tp> bool paramRange(int paramId, _Tp& minVal, _Tp& maxVal) const;
+    template<typename _Tp> typename ParamType<_Tp>::member_type get(const string& name) const;
+    template<typename _Tp> typename ParamType<_Tp>::member_type get(const char* name) const;
     
-    virtual void getParams(vector<int>& ids) const;
-    virtual void write(vector<uchar>& buf) const;
-    virtual bool read(const vector<uchar>& buf);
+    CV_WRAP int getInt(const string& name) const;
+    CV_WRAP double getDouble(const string& name) const;
+    CV_WRAP bool getBool(const string& name) const;
+    CV_WRAP string getString(const string& name) const;
+    CV_WRAP Mat getMat(const string& name) const;
+    CV_WRAP vector<Mat> getMatVector(const string& name) const;
+    CV_WRAP Ptr<Algorithm> getAlgorithm(const string& name) const;
+    
+    CV_WRAP_AS(setInt) void set(const string& name, int value);
+    CV_WRAP_AS(setDouble) void set(const string& name, double value);
+    CV_WRAP_AS(setBool) void set(const string& name, bool value);
+    CV_WRAP_AS(setString) void set(const string& name, const string& value);
+    CV_WRAP_AS(setMat) void set(const string& name, const Mat& value);
+    CV_WRAP_AS(setMatVector) void set(const string& name, const vector<Mat>& value);
+    CV_WRAP_AS(setAlgorithm) void set(const string& name, const Ptr<Algorithm>& value);
+    
+    void set(const char* name, int value);
+    void set(const char* name, double value);
+    void set(const char* name, bool value);
+    void set(const char* name, const string& value);
+    void set(const char* name, const Mat& value);
+    void set(const char* name, const vector<Mat>& value);
+    void set(const char* name, const Ptr<Algorithm>& value);
+    
+    CV_WRAP string paramHelp(const string& name) const;
+    int paramType(const char* name) const;
+    CV_WRAP int paramType(const string& name) const;
+    CV_WRAP void getParams(CV_OUT vector<string>& names) const;
+    
+    
+    virtual void write(FileStorage& fs) const;
+    virtual void read(const FileNode& fn);
     
     typedef Algorithm* (*Constructor)(void);
-    static void add(const string& name, Constructor create);
-    static void getList(vector<string>& algorithms);
-    static Ptr<Algorithm> create(const string& name);
+    typedef int (Algorithm::*Getter)() const;
+    typedef void (Algorithm::*Setter)(int);
     
-protected:
-    template<typename _Tp> void addParam(int propId, _Tp& value, bool readOnly, const string& name,
-                                         const string& help=string(), const _Tp& defaultValue=_Tp(),
-                                         _Tp (Algorithm::*getter)()=0, bool (Algorithm::*setter)(const _Tp&)=0);
-    template<typename _Tp> void setParamRange(int propId, const _Tp& minVal, const _Tp& maxVal);
+    CV_WRAP static void getList(CV_OUT vector<string>& algorithms);
+    CV_WRAP static Ptr<Algorithm> _create(const string& name);
+    template<typename _Tp> static Ptr<_Tp> create(const string& name);
     
-    bool set_(int paramId, int argType, const void* value);
-    void get_(int paramId, int argType, void* value);
-    void paramDefaultValue_(int paramId, int argType, void* value);
-    void paramRange_(int paramId, int argType, void* minval, void* maxval);
-    void addParam_(int propId, int argType, void* value, bool readOnly, const string& name,
-                  const string& help, const void* defaultValue, void* getter, void* setter);
-    void setParamRange_(int propId, int argType, const void* minVal, const void* maxVal);
-    
-    Ptr<AlgorithmImpl> impl;
+    virtual AlgorithmInfo* info() const /* TODO: make it = 0;*/ { return 0; }
 };
-#endif
 
+    
+class CV_EXPORTS AlgorithmInfo
+{
+public:
+    friend class Algorithm;
+    AlgorithmInfo(const string& name, Algorithm::Constructor create);
+    ~AlgorithmInfo();
+    void get(const Algorithm* algo, const char* name, int argType, void* value) const;
+    void addParam_(Algorithm& algo, const char* name, int argType,
+                   void* value, bool readOnly, 
+                   Algorithm::Getter getter, Algorithm::Setter setter,
+                   const string& help=string());
+    string paramHelp(const char* name) const;
+    int paramType(const char* name) const;
+    void getParams(vector<string>& names) const;
+    
+    void write(const Algorithm* algo, FileStorage& fs) const;
+    void read(Algorithm* algo, const FileNode& fn) const;
+    string name() const;
+    
+    void addParam(Algorithm& algo, const char* name,
+                  int& value, bool readOnly=false, 
+                  int (Algorithm::*getter)()=0,
+                  void (Algorithm::*setter)(int)=0,
+                  const string& help=string());
+    void addParam(Algorithm& algo, const char* name,
+                  bool& value, bool readOnly=false, 
+                  int (Algorithm::*getter)()=0,
+                  void (Algorithm::*setter)(int)=0,
+                  const string& help=string());
+    void addParam(Algorithm& algo, const char* name,
+                  double& value, bool readOnly=false, 
+                  double (Algorithm::*getter)()=0,
+                  void (Algorithm::*setter)(double)=0,
+                  const string& help=string());
+    void addParam(Algorithm& algo, const char* name,
+                  string& value, bool readOnly=false, 
+                  string (Algorithm::*getter)()=0,
+                  void (Algorithm::*setter)(const string&)=0,
+                  const string& help=string());
+    void addParam(Algorithm& algo, const char* name,
+                  Mat& value, bool readOnly=false, 
+                  Mat (Algorithm::*getter)()=0,
+                  void (Algorithm::*setter)(const Mat&)=0,
+                  const string& help=string());
+    void addParam(Algorithm& algo, const char* name,
+                  vector<Mat>& value, bool readOnly=false, 
+                  vector<Mat> (Algorithm::*getter)()=0,
+                  void (Algorithm::*setter)(const vector<Mat>&)=0,
+                  const string& help=string());
+    void addParam(Algorithm& algo, const char* name,
+                  Ptr<Algorithm>& value, bool readOnly=false, 
+                  Ptr<Algorithm> (Algorithm::*getter)()=0,
+                  void (Algorithm::*setter)(const Ptr<Algorithm>&)=0,
+                  const string& help=string());
+protected:
+    AlgorithmInfoData* data;
+    void set(Algorithm* algo, const char* name, int argType,
+              const void* value, bool force=false) const;
+};
+
+
+struct CV_EXPORTS Param
+{
+    enum { INT=0, BOOLEAN=1, REAL=2, STRING=3, MAT=4, MAT_VECTOR=5, ALGORITHM=6 };
+    
+    Param();
+    Param(int _type, bool _readonly, int _offset,
+          Algorithm::Getter _getter=0,
+          Algorithm::Setter _setter=0,
+          const string& _help=string());
+    int type;
+    int offset;
+    bool readonly;
+    Algorithm::Getter getter;
+    Algorithm::Setter setter;
+    string help;
+};
+
+template<> struct ParamType<bool>
+{
+    typedef bool const_param_type;
+    typedef bool member_type;
+    
+    enum { type = Param::BOOLEAN };
+};    
+    
+template<> struct ParamType<int>
+{
+    typedef int const_param_type;
+    typedef int member_type;
+    
+    enum { type = Param::INT };
+};
+
+template<> struct ParamType<double>
+{
+    typedef double const_param_type;
+    typedef double member_type;
+    
+    enum { type = Param::REAL };
+};
+
+template<> struct ParamType<string>
+{
+    typedef const string& const_param_type;
+    typedef string member_type;
+    
+    enum { type = Param::STRING };
+};
+
+template<> struct ParamType<Mat>
+{
+    typedef const Mat& const_param_type;
+    typedef Mat member_type;
+    
+    enum { type = Param::MAT };
+};
+
+template<> struct ParamType<vector<Mat> >
+{
+    typedef const vector<Mat>& const_param_type;
+    typedef vector<Mat> member_type;
+    
+    enum { type = Param::MAT_VECTOR };
+};
+
+template<> struct ParamType<Algorithm>
+{
+    typedef const Ptr<Algorithm>& const_param_type;
+    typedef Ptr<Algorithm> member_type;
+    
+    enum { type = Param::ALGORITHM };
+};
+    
+    
 /*!
- Command Line Parser
-
- The class is used for reading command arguments.
- Supports the following syntax:
-   //-k=10 --key --db=-10.11 -key1 argument --inputFile=lena.jpg
-   CommandLineParser parser(argc, argv);
-   int k = parser.get<int>("k", -1);        //these methods also work
-   double db = parser.get<double>("db");    //with <float> and <unsigned int> type
-   bool key = parser.get<bool>("key"); <The method return 'true', if 'key' was defined in command line
-           "                           and it will return 'false' otherwise.>
-   bool key1 = parser.get<bool>("key1"); The method return 'true', if 'key' was defined in command line
-           "                             and it will return 'false' otherwise.>
-   string argument = parser.get<string>("0"); <If you need to take argument. It's the first parameter without '-' or '--' increment
-                            and without value. It has index 0. The second parameter of this type will have index 1>
-                            It also works with 'int', 'unsigned int', 'double' and 'float' types.
-   string inputFile = parser.get<string>("inputFile");
+"\nThe CommandLineParser class is designed for command line arguments parsing\n"
+           "Keys map: \n"
+           "Before you start to work with CommandLineParser you have to create a map for keys.\n"
+           "    It will look like this\n"
+           "    const char* keys =\n"
+           "    {\n"
+           "        {    s|  string|  123asd |string parameter}\n"
+           "        {    d|  digit |  100    |digit parameter }\n"
+           "        {    c|noCamera|false    |without camera  }\n"
+           "        {    1|        |some text|help            }\n"
+           "        {    2|        |333      |another help    }\n"
+           "    };\n"
+           "Usage syntax: \n"
+           "    \"{\" - start of parameter string.\n"
+           "    \"}\" - end of parameter string\n"
+           "    \"|\" - separator between short name, full name, default value and help\n"
+           "Supported syntax: \n"
+           "    --key1=arg1  <If a key with '--' must has an argument\n"
+           "                  you have to assign it through '=' sign.> \n"
+           "<If the key with '--' doesn't have any argument, it means that it is a bool key>\n"
+           "    -key2=arg2   <If a key with '-' must has an argument \n"
+           "                  you have to assign it through '=' sign.> \n"
+           "If the key with '-' doesn't have any argument, it means that it is a bool key\n"
+           "    key3                 <This key can't has any parameter> \n"
+           "Usage: \n"
+           "      Imagine that the input parameters are next:\n"
+           "                -s=string_value --digit=250 --noCamera lena.jpg 10000\n"
+           "    CommandLineParser parser(argc, argv, keys) - create a parser object\n"
+           "    parser.get<string>(\"s\" or \"string\") will return you first parameter value\n"
+           "    parser.get<string>(\"s\", false or \"string\", false) will return you first parameter value\n"
+           "                                                                without spaces in end and begin\n"
+           "    parser.get<int>(\"d\" or \"digit\") will return you second parameter value.\n"
+           "                    It also works with 'unsigned int', 'double', and 'float' types>\n"
+           "    parser.get<bool>(\"c\" or \"noCamera\") will return you true .\n"
+           "                                If you enter this key in commandline>\n"
+           "                                It return you false otherwise.\n"
+           "    parser.get<string>(\"1\") will return you the first argument without parameter (lena.jpg) \n"
+           "    parser.get<int>(\"2\") will return you the second argument without parameter (10000)\n"
+           "                          It also works with 'unsigned int', 'double', and 'float' types \n"
 */
 class CV_EXPORTS CommandLineParser
 {
     public:
 
-        //! the default constructor
-        CommandLineParser(int argc, const char* argv[]);
+    //! the default constructor
+      CommandLineParser(int argc, const char* const argv[], const char* key_map);
 
-        //! get parameter, if parameter is not given get default parameter
-        template<typename _Tp>
-        _Tp get(const std::string& name, const _Tp& default_value = _Tp())
+    //! get parameter, you can choose: delete spaces in end and begin or not
+    template<typename _Tp>
+    _Tp get(const std::string& name, bool space_delete=true)
+    {
+        if (!has(name))
         {
-            std::string str = getString(name);
-            if (!has(name))
-                return default_value;
-            return analyzeValue<_Tp>(str);
+            return _Tp();
         }
+        std::string str = getString(name);
+        return analyzeValue<_Tp>(str, space_delete);
+    }
+
+    //! print short name, full name, current value and help for all params
+    void printParams();
 
     protected:
-        std::map<std::string, std::string > data;
-        std::string getString(const std::string& name) const;
+    std::map<std::string, std::vector<std::string> > data;
+    std::string getString(const std::string& name);
 
-        bool has(const std::string& keys) const;
+    bool has(const std::string& keys);
 
-        template<typename _Tp>
-        static _Tp getData(const std::string& str)
-        {
-            _Tp res;
-            std::stringstream s1(str);
-            s1 >> res;
-            return res;
-        }
+    template<typename _Tp>
+    _Tp analyzeValue(const std::string& str, bool space_delete=false);
 
-        template<typename _Tp>
-        _Tp fromStringNumber(const std::string& str);//the default conversion function for numbers
+    template<typename _Tp>
+    static _Tp getData(const std::string& str)
+    {
+        _Tp res;
+        std::stringstream s1(str);
+        s1 >> res;
+        return res;
+    }
 
-        template<typename _Tp>
-        _Tp analyzeValue(const std::string& str);
+    template<typename _Tp>
+     _Tp fromStringNumber(const std::string& str);//the default conversion function for numbers
+
     };
-    template<> CV_EXPORTS
-    bool CommandLineParser::get<bool>(const std::string& name, const bool& default_value);
 
-    template<> CV_EXPORTS
-    std::string CommandLineParser::analyzeValue<std::string>(const std::string& str);
+template<> CV_EXPORTS
+bool CommandLineParser::get<bool>(const std::string& name, bool space_delete);
 
-    template<> CV_EXPORTS
-    int CommandLineParser::analyzeValue<int>(const std::string& str);
+template<> CV_EXPORTS
+std::string CommandLineParser::analyzeValue<std::string>(const std::string& str, bool space_delete);
 
-    template<> CV_EXPORTS
-    unsigned CommandLineParser::analyzeValue<unsigned int>(const std::string& str);
+template<> CV_EXPORTS
+int CommandLineParser::analyzeValue<int>(const std::string& str, bool space_delete);
 
-    template<> CV_EXPORTS
-    float CommandLineParser::analyzeValue<float>(const std::string& str);
+template<> CV_EXPORTS
+unsigned int CommandLineParser::analyzeValue<unsigned int>(const std::string& str, bool space_delete);
 
-    template<> CV_EXPORTS
-    double CommandLineParser::analyzeValue<double>(const std::string& str);
+template<> CV_EXPORTS
+uint64 CommandLineParser::analyzeValue<uint64>(const std::string& str, bool space_delete);
+
+template<> CV_EXPORTS
+float CommandLineParser::analyzeValue<float>(const std::string& str, bool space_delete);
+
+template<> CV_EXPORTS
+double CommandLineParser::analyzeValue<double>(const std::string& str, bool space_delete);
 
 }
 

@@ -4,7 +4,7 @@ import colorsys
 
 print "OpenCV Python version of drawing"
 
-import cv
+import cv2.cv as cv
 
 def random_color(random):
     """
@@ -159,3 +159,4 @@ if __name__ == '__main__':
 
     # wait some key to end
     cv.WaitKey(0)
+    cv.DestroyAllWindows()

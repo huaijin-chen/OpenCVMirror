@@ -540,7 +540,7 @@ findStereoCorrespondenceBM( const Mat& left, const Mat& right,
     sad = (int*)alignPtr(buf + sizeof(sad[0]), ALIGN);
     hsad0 = (int*)alignPtr(sad + ndisp + 1 + dy0*ndisp, ALIGN);
     htext = (int*)alignPtr((int*)(hsad0 + (height+dy1)*ndisp) + wsz2 + 2, ALIGN);
-    cbuf0 = (uchar*)alignPtr(htext + height + wsz2 + 2 + dy0*ndisp, ALIGN);
+    cbuf0 = (uchar*)alignPtr((uchar*)(htext + height + wsz2 + 2) + dy0*ndisp, ALIGN);
 
     for( x = 0; x < TABSZ; x++ )
         tab[x] = (uchar)std::abs(x - ftzero);
@@ -552,8 +552,8 @@ findStereoCorrespondenceBM( const Mat& left, const Mat& right,
     for( x = -wsz2-1; x < wsz2; x++ )
     {
         hsad = hsad0 - dy0*ndisp; cbuf = cbuf0 + (x + wsz2 + 1)*cstep - dy0*ndisp;
-        lptr = lptr0 + MIN(MAX(x, -lofs), width-lofs-1) - dy0*sstep;
-        rptr = rptr0 + MIN(MAX(x, -rofs), width-rofs-1) - dy0*sstep;
+        lptr = lptr0 + std::min(std::max(x, -lofs), width-lofs-1) - dy0*sstep;
+        rptr = rptr0 + std::min(std::max(x, -rofs), width-rofs-1) - dy0*sstep;
 
         for( y = -dy0; y < height + dy1; y++, hsad += ndisp, cbuf += ndisp, lptr += sstep, rptr += sstep )
         {
@@ -567,7 +567,7 @@ findStereoCorrespondenceBM( const Mat& left, const Mat& right,
             htext[y] += tab[lval];
         }
     }
-
+    
     // initialize the left and right borders of the disparity map
     for( y = 0; y < height; y++ )
     {
@@ -718,7 +718,7 @@ struct FindStereoCorrespInvoker
         uchar *ptr = state->slidingSumBuf->data.ptr + range.begin() * stripeBufSize;
         int FILTERED = (state->minDisparity - 1)*16;
         
-        Rect roi = validDisparityRect & Rect(0, _row0, cols, _row1);
+        Rect roi = validDisparityRect & Rect(0, _row0, cols, _row1 - _row0);
         if( roi.height == 0 )
             return;
         int row0 = roi.y;
@@ -852,10 +852,12 @@ static void findStereoCorrespondenceBM( const Mat& left0, const Mat& right0, Mat
     }
              
     int wsz = state->SADWindowSize;    
-    int bufSize0 = (ndisp + 2)*sizeof(int) + (height+wsz+2)*ndisp*sizeof(int) +
-                    (height + wsz + 2)*sizeof(int) +
-                    (height+wsz+2)*ndisp*(wsz+1)*sizeof(uchar) + 256;
-    int bufSize1 = (width + state->preFilterSize + 2) * sizeof(int) + 256;
+    int bufSize0 = (int)((ndisp + 2)*sizeof(int));
+    bufSize0 += (int)((height+wsz+2)*ndisp*sizeof(int));
+    bufSize0 += (int)((height + wsz + 2)*sizeof(int));
+    bufSize0 += (int)((height+wsz+2)*ndisp*(wsz+2)*sizeof(uchar) + 256);
+
+    int bufSize1 = (int)((width + state->preFilterSize + 2) * sizeof(int) + 256);
     int bufSize2 = 0;
     if( state->speckleRange >= 0 && state->speckleWindowSize > 0 )
         bufSize2 = width*height*(sizeof(cv::Point_<short>) + sizeof(int) + sizeof(uchar));
@@ -871,7 +873,6 @@ static void findStereoCorrespondenceBM( const Mat& left0, const Mat& right0, Mat
     double N0 = 8000000 / (useShorts ? 1 : 4);  // approx tbb's min number instructions reasonable for one thread    
     double maxStripeSize = min(max(N0 / (width * ndisp), (wsz-1) * SAD_overhead_coeff), (double)height);
     int nstripes = cvCeil(height / maxStripeSize);
-    printf("nstripes=%d\n", nstripes);
 #else
     const int nstripes = 1;
 #endif

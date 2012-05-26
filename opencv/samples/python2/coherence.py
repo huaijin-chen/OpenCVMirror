@@ -1,14 +1,14 @@
 '''
-  Coherence-enhancing filtering example
+Coherence-enhancing filtering example
+=====================================
 
-  inspired by  
-    Joachim Weickert "Coherence-Enhancing Shock Filters"
-    http://www.mia.uni-saarland.de/Publications/weickert-dagm03.pdf
+inspired by  
+  Joachim Weickert "Coherence-Enhancing Shock Filters"
+  http://www.mia.uni-saarland.de/Publications/weickert-dagm03.pdf
 '''
 
 import numpy as np
-import cv2, cv
-
+import cv2
 
 def coherence_filter(img, sigma = 11, str_sigma = 11, blend = 0.5, iter_n = 4):
     h, w = img.shape[:2]
@@ -16,14 +16,14 @@ def coherence_filter(img, sigma = 11, str_sigma = 11, blend = 0.5, iter_n = 4):
     for i in xrange(iter_n):
         print i,
         
-        gray = cv2.cvtColor(img, cv.CV_BGR2GRAY)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         eigen = cv2.cornerEigenValsAndVecs(gray, str_sigma, 3)
         eigen = eigen.reshape(h, w, 3, 2)  # [[e1, e2], v1, v2]
         x, y = eigen[:,:,1,0], eigen[:,:,1,1]
         
-        gxx = cv2.sobel(gray, cv2.CV_32F, 2, 0, ksize=sigma)
-        gxy = cv2.sobel(gray, cv2.CV_32F, 1, 1, ksize=sigma)
-        gyy = cv2.sobel(gray, cv2.CV_32F, 0, 2, ksize=sigma)
+        gxx = cv2.Sobel(gray, cv2.CV_32F, 2, 0, ksize=sigma)
+        gxy = cv2.Sobel(gray, cv2.CV_32F, 1, 1, ksize=sigma)
+        gyy = cv2.Sobel(gray, cv2.CV_32F, 0, 2, ksize=sigma)
         gvv = x*x*gxx + 2*x*y*gxy + y*y*gyy
         m = gvv < 0
 
@@ -65,8 +65,9 @@ if __name__ == '__main__':
     cv2.imshow('src', src)
     update()
     while True:
-        ch = cv2.waitKey()
+        ch = 0xFF & cv2.waitKey()
         if ch == ord(' '):
             update()
         if ch == 27:
             break
+    cv2.destroyAllWindows() 			

@@ -56,7 +56,13 @@
 #else
 #include <png.h>
 #endif
+#include <zlib.h>
 #include "grfmt_png.hpp"
+
+#if defined _MSC_VER && _MSC_VER >= 1200
+    // disable warnings related to _setjmp
+    #pragma warning( disable: 4611 )
+#endif
 
 namespace cv
 {
@@ -166,9 +172,18 @@ bool  PngDecoder::readHeader()
 
                     if( bit_depth <= 8 || bit_depth == 16 )
                     {
-                        m_type = color_type == PNG_COLOR_TYPE_RGB ||
-                             color_type == PNG_COLOR_TYPE_RGB_ALPHA ||
-                             color_type == PNG_COLOR_TYPE_PALETTE ? CV_8UC3 : CV_8UC1;
+                        switch(color_type) 
+                        {
+                           case PNG_COLOR_TYPE_RGB:
+                           case PNG_COLOR_TYPE_PALETTE:
+                               m_type = CV_8UC3;
+                               break;
+                          case PNG_COLOR_TYPE_RGB_ALPHA:
+                               m_type = CV_8UC4;
+                               break;
+                          default:
+                               m_type = CV_8UC1;
+                        }
                         if( bit_depth == 16 )
                             m_type = CV_MAKETYPE(CV_16U, CV_MAT_CN(m_type));
                         result = true;
@@ -209,21 +224,25 @@ bool  PngDecoder::readData( Mat& img )
             else if( !isBigEndian() )
                 png_set_swap( png_ptr );
 
-            /* observation: png_read_image() writes 400 bytes beyond
-             * end of data when reading a 400x118 color png
-             * "mpplus_sand.png".  OpenCV crashes even with demo
-             * programs.  Looking at the loaded image I'd say we get 4
-             * bytes per pixel instead of 3 bytes per pixel.  Test
-             * indicate that it is a good idea to always ask for
-             * stripping alpha..  18.11.2004 Axel Walthelm
-             */
-            png_set_strip_alpha( png_ptr );
+            if(img.channels() < 4) 
+            {
+                /* observation: png_read_image() writes 400 bytes beyond
+                 * end of data when reading a 400x118 color png
+                 * "mpplus_sand.png".  OpenCV crashes even with demo
+                 * programs.  Looking at the loaded image I'd say we get 4
+                 * bytes per pixel instead of 3 bytes per pixel.  Test
+                 * indicate that it is a good idea to always ask for
+                 * stripping alpha..  18.11.2004 Axel Walthelm
+                 */
+                 png_set_strip_alpha( png_ptr );
+            }
 
             if( m_color_type == PNG_COLOR_TYPE_PALETTE )
                 png_set_palette_to_rgb( png_ptr );
 
             if( m_color_type == PNG_COLOR_TYPE_GRAY && m_bit_depth < 8 )
-#if PNG_LIBPNG_VER_MAJOR*100 + PNG_LIBPNG_VER_MINOR >= 104
+#if (PNG_LIBPNG_VER_MAJOR*10000 + PNG_LIBPNG_VER_MINOR*100 + PNG_LIBPNG_VER_RELEASE >= 10209) || \
+    (PNG_LIBPNG_VER_MAJOR == 1 && PNG_LIBPNG_VER_MINOR == 0 && PNG_LIBPNG_VER_RELEASE >= 18)
                 png_set_expand_gray_1_2_4_to_8( png_ptr );
 #else
                 png_set_gray_1_2_4_to_8( png_ptr );
@@ -299,6 +318,7 @@ void PngEncoder::flushBuf(void*)
 bool  PngEncoder::write( const Mat& img, const vector<int>& params )
 {
     int compression_level = 0;
+    int compression_strategy = Z_RLE;
 
     for( size_t i = 0; i < params.size(); i += 2 )
     {
@@ -306,6 +326,11 @@ bool  PngEncoder::write( const Mat& img, const vector<int>& params )
         {
             compression_level = params[i+1];
             compression_level = MIN(MAX(compression_level, 0), MAX_MEM_LEVEL);
+        }
+        if( params[i] == CV_IMWRITE_PNG_STRATEGY )
+        {
+            compression_strategy = params[i+1];
+            compression_strategy = MIN(MAX(compression_strategy, 0), Z_FIXED); 
         }
     }
 
@@ -353,7 +378,7 @@ bool  PngEncoder::write( const Mat& img, const vector<int>& params )
                         png_set_filter(png_ptr, PNG_FILTER_TYPE_BASE, PNG_FILTER_SUB);
                         png_set_compression_level(png_ptr, Z_BEST_SPEED);
                     }
-                    png_set_compression_strategy(png_ptr, Z_HUFFMAN_ONLY);
+                    png_set_compression_strategy(png_ptr, compression_strategy);
 
                     png_set_IHDR( png_ptr, info_ptr, width, height, depth == CV_8U ? 8 : 16,
                         channels == 1 ? PNG_COLOR_TYPE_GRAY :

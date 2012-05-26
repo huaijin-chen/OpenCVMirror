@@ -39,97 +39,307 @@
 //
 //M*/
 
-#include "test_precomp.hpp"
+#include "precomp.hpp"
 
-using namespace cv;
-using namespace cv::gpu;
-using namespace cvtest;
+namespace {
 
-TEST(projectPoints, accuracy)
+//////////////////////////////////////////////////////////////////////////
+// StereoBM
+
+struct StereoBM : testing::TestWithParam<cv::gpu::DeviceInfo>
 {
-    RNG& rng = TS::ptr()->get_rng();
-    Mat src = randomMat(rng, Size(1000, 1), CV_32FC3, 0, 10, false);
-    Mat rvec = randomMat(rng, Size(3, 1), CV_32F, 0, 1, false);
-    Mat tvec = randomMat(rng, Size(3, 1), CV_32F, 0, 1, false);
-    Mat camera_mat = randomMat(rng, Size(3, 3), CV_32F, 0, 1, false);
-    camera_mat.at<float>(0, 1) = 0.f;
-    camera_mat.at<float>(1, 0) = 0.f;
-    camera_mat.at<float>(2, 0) = 0.f;
-    camera_mat.at<float>(2, 1) = 0.f;
+    cv::gpu::DeviceInfo devInfo;
 
-    vector<Point2f> dst;
-    projectPoints(src, rvec, tvec, camera_mat, Mat(1, 8, CV_32F, Scalar::all(0)), dst);
-
-    GpuMat d_dst;
-    projectPoints(GpuMat(src), rvec, tvec, camera_mat, Mat(), d_dst);
-
-    ASSERT_EQ(dst.size(), (size_t)d_dst.cols);
-    ASSERT_EQ(1, d_dst.rows);
-    ASSERT_EQ(CV_32FC2, d_dst.type());
-
-    Mat h_dst(d_dst);
-    for (size_t i = 0; i < dst.size(); ++i)
+    virtual void SetUp()
     {
-        Point2f res_gold = dst[i];
-        Point2f res_actual = h_dst.at<Point2f>(0, i);
-        Point2f err = res_actual - res_gold;
-        ASSERT_LT(err.dot(err) / res_gold.dot(res_gold), 1e-3f);
+        devInfo = GetParam();
+
+        cv::gpu::setDevice(devInfo.deviceID());
     }
+};
+
+TEST_P(StereoBM, Regression)
+{
+    cv::Mat left_image  = readImage("stereobm/aloe-L.png", cv::IMREAD_GRAYSCALE);
+    cv::Mat right_image = readImage("stereobm/aloe-R.png", cv::IMREAD_GRAYSCALE);
+    cv::Mat disp_gold   = readImage("stereobm/aloe-disp.png", cv::IMREAD_GRAYSCALE);
+
+    ASSERT_FALSE(left_image.empty());
+    ASSERT_FALSE(right_image.empty());
+    ASSERT_FALSE(disp_gold.empty());
+
+    cv::gpu::StereoBM_GPU bm(0, 128, 19);
+    cv::gpu::GpuMat disp;
+
+    bm(loadMat(left_image), loadMat(right_image), disp);
+
+    EXPECT_MAT_NEAR(disp_gold, disp, 0.0);
 }
 
+INSTANTIATE_TEST_CASE_P(GPU_Calib3D, StereoBM, ALL_DEVICES);
 
-TEST(transformPoints, accuracy)
+//////////////////////////////////////////////////////////////////////////
+// StereoBeliefPropagation
+
+struct StereoBeliefPropagation : testing::TestWithParam<cv::gpu::DeviceInfo>
 {
-    RNG& rng = TS::ptr()->get_rng();
-    Mat src = randomMat(rng, Size(1000, 1), CV_32FC3, 0, 10, false);
-    Mat rvec = randomMat(rng, Size(3, 1), CV_32F, 0, 1, false);
-    Mat tvec = randomMat(rng, Size(3, 1), CV_32F, 0, 1, false);
+    cv::gpu::DeviceInfo devInfo;
 
-    GpuMat d_dst;
-    transformPoints(GpuMat(src), rvec, tvec, d_dst);
-    ASSERT_TRUE(src.size() == d_dst.size());
-    ASSERT_EQ(src.type(), d_dst.type());
+    virtual void SetUp()
+    {
+        devInfo = GetParam();
 
-    Mat h_dst(d_dst);
-    Mat rot;
-    Rodrigues(rvec, rot);
+        cv::gpu::setDevice(devInfo.deviceID());
+    }
+};
+
+TEST_P(StereoBeliefPropagation, Regression)
+{
+    cv::Mat left_image  = readImage("stereobp/aloe-L.png");
+    cv::Mat right_image = readImage("stereobp/aloe-R.png");
+    cv::Mat disp_gold   = readImage("stereobp/aloe-disp.png", cv::IMREAD_GRAYSCALE);
+
+    ASSERT_FALSE(left_image.empty());
+    ASSERT_FALSE(right_image.empty());
+    ASSERT_FALSE(disp_gold.empty());
+
+    cv::gpu::StereoBeliefPropagation bp(64, 8, 2, 25, 0.1f, 15, 1, CV_16S);
+    cv::gpu::GpuMat disp;
+
+    bp(loadMat(left_image), loadMat(right_image), disp);
+
+    cv::Mat h_disp(disp);
+    h_disp.convertTo(h_disp, disp_gold.depth());
+
+    EXPECT_MAT_NEAR(disp_gold, h_disp, 0.0);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Calib3D, StereoBeliefPropagation, ALL_DEVICES);
+
+//////////////////////////////////////////////////////////////////////////
+// StereoConstantSpaceBP
+
+struct StereoConstantSpaceBP : testing::TestWithParam<cv::gpu::DeviceInfo>
+{
+    cv::gpu::DeviceInfo devInfo;
+
+    virtual void SetUp()
+    {
+        devInfo = GetParam();
+
+        cv::gpu::setDevice(devInfo.deviceID());
+    }
+};
+
+TEST_P(StereoConstantSpaceBP, Regression)
+{
+    cv::Mat left_image  = readImage("csstereobp/aloe-L.png");
+    cv::Mat right_image = readImage("csstereobp/aloe-R.png");
+
+    cv::Mat disp_gold;
+
+    if (supportFeature(devInfo, cv::gpu::FEATURE_SET_COMPUTE_20))
+        disp_gold = readImage("csstereobp/aloe-disp.png", cv::IMREAD_GRAYSCALE);
+    else
+        disp_gold = readImage("csstereobp/aloe-disp_CC1X.png", cv::IMREAD_GRAYSCALE);
+
+    ASSERT_FALSE(left_image.empty());
+    ASSERT_FALSE(right_image.empty());
+    ASSERT_FALSE(disp_gold.empty());
+
+    cv::gpu::StereoConstantSpaceBP csbp(128, 16, 4, 4);
+    cv::gpu::GpuMat disp;
+
+    csbp(loadMat(left_image), loadMat(right_image), disp);
+
+    cv::Mat h_disp(disp);
+    h_disp.convertTo(h_disp, disp_gold.depth());
+
+    EXPECT_MAT_NEAR(disp_gold, h_disp, 1.0);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Calib3D, StereoConstantSpaceBP, ALL_DEVICES);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+// transformPoints
+
+struct TransformPoints : testing::TestWithParam<cv::gpu::DeviceInfo>
+{
+    cv::gpu::DeviceInfo devInfo;
+
+    virtual void SetUp()
+    {
+        devInfo = GetParam();
+
+        cv::gpu::setDevice(devInfo.deviceID());
+    }
+};
+
+TEST_P(TransformPoints, Accuracy)
+{
+    cv::Mat src = randomMat(cv::Size(1000, 1), CV_32FC3, 0, 10);
+    cv::Mat rvec = randomMat(cv::Size(3, 1), CV_32F, 0, 1);
+    cv::Mat tvec = randomMat(cv::Size(3, 1), CV_32F, 0, 1);
+
+    cv::gpu::GpuMat dst;
+    cv::gpu::transformPoints(loadMat(src), rvec, tvec, dst);
+
+    ASSERT_EQ(src.size(), dst.size());
+    ASSERT_EQ(src.type(), dst.type());
+
+    cv::Mat h_dst(dst);
+
+    cv::Mat rot;
+    cv::Rodrigues(rvec, rot);
+
     for (int i = 0; i < h_dst.cols; ++i)
     {
-        Point3f p = src.at<Point3f>(0, i);
-        Point3f res_gold(
+        cv::Point3f res = h_dst.at<cv::Point3f>(0, i);
+
+        cv::Point3f p = src.at<cv::Point3f>(0, i);
+        cv::Point3f res_gold(
                 rot.at<float>(0, 0) * p.x + rot.at<float>(0, 1) * p.y + rot.at<float>(0, 2) * p.z + tvec.at<float>(0, 0),
                 rot.at<float>(1, 0) * p.x + rot.at<float>(1, 1) * p.y + rot.at<float>(1, 2) * p.z + tvec.at<float>(0, 1),
                 rot.at<float>(2, 0) * p.x + rot.at<float>(2, 1) * p.y + rot.at<float>(2, 2) * p.z + tvec.at<float>(0, 2));
-        Point3f res_actual = h_dst.at<Point3f>(0, i);
-        Point3f err = res_actual - res_gold;
-        ASSERT_LT(err.dot(err) / res_gold.dot(res_gold), 1e-3f);
+
+        ASSERT_POINT3_NEAR(res_gold, res, 1e-5);
     }
 }
 
+INSTANTIATE_TEST_CASE_P(GPU_Calib3D, TransformPoints, ALL_DEVICES);
 
-TEST(solvePnPRansac, accuracy)
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+// ProjectPoints
+
+struct ProjectPoints : testing::TestWithParam<cv::gpu::DeviceInfo>
 {
-    RNG& rng = TS::ptr()->get_rng();
+    cv::gpu::DeviceInfo devInfo;
 
-    const int num_points = 5000;
-    Mat object = randomMat(rng, Size(num_points, 1), CV_32FC3, 0, 100, false);
-    Mat camera_mat = randomMat(rng, Size(3, 3), CV_32F, 0.5, 1, false);
+    virtual void SetUp()
+    {
+        devInfo = GetParam();
+
+        cv::gpu::setDevice(devInfo.deviceID());
+    }
+};
+
+TEST_P(ProjectPoints, Accuracy)
+{
+    cv::Mat src = randomMat(cv::Size(1000, 1), CV_32FC3, 0, 10);
+    cv::Mat rvec = randomMat(cv::Size(3, 1), CV_32F, 0, 1);
+    cv::Mat tvec = randomMat(cv::Size(3, 1), CV_32F, 0, 1);
+    cv::Mat camera_mat = randomMat(cv::Size(3, 3), CV_32F, 0.5, 1);
     camera_mat.at<float>(0, 1) = 0.f;
     camera_mat.at<float>(1, 0) = 0.f;
     camera_mat.at<float>(2, 0) = 0.f;
     camera_mat.at<float>(2, 1) = 0.f;
 
-    Mat rvec_gold = randomMat(rng, Size(3, 1), CV_32F, 0, 1, false);
-    Mat tvec_gold = randomMat(rng, Size(3, 1), CV_32F, 0, 1, false);
+    cv::gpu::GpuMat dst;
+    cv::gpu::projectPoints(loadMat(src), rvec, tvec, camera_mat, cv::Mat(), dst);
 
-    vector<Point2f> image_vec;
-    projectPoints(object, rvec_gold, tvec_gold, camera_mat, Mat(1, 8, CV_32F, Scalar::all(0)), image_vec);
-    Mat image(1, image_vec.size(), CV_32FC2, &image_vec[0]);
+    ASSERT_EQ(1, dst.rows);
+    ASSERT_EQ(MatType(CV_32FC2), MatType(dst.type()));
 
-    Mat rvec, tvec;
-    vector<int> inliers;
-    gpu::solvePnPRansac(object, image, camera_mat, Mat(1, 8, CV_32F, Scalar::all(0)), rvec, tvec, false, 200, 2.f, 100, &inliers);
+    std::vector<cv::Point2f> dst_gold;
+    cv::projectPoints(src, rvec, tvec, camera_mat, cv::Mat(1, 8, CV_32F, cv::Scalar::all(0)), dst_gold);
 
-    ASSERT_LE(norm(rvec - rvec_gold), 1e-3f);
-    ASSERT_LE(norm(tvec - tvec_gold), 1e-3f);
+    ASSERT_EQ(dst_gold.size(), static_cast<size_t>(dst.cols));
+
+    cv::Mat h_dst(dst);
+
+    for (size_t i = 0; i < dst_gold.size(); ++i)
+    {
+        cv::Point2f res = h_dst.at<cv::Point2f>(0, (int)i);
+        cv::Point2f res_gold = dst_gold[i];
+
+        ASSERT_LE(cv::norm(res_gold - res) / cv::norm(res_gold), 1e-3f);
+    }
 }
+
+INSTANTIATE_TEST_CASE_P(GPU_Calib3D, ProjectPoints, ALL_DEVICES);
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////
+// SolvePnPRansac
+
+struct SolvePnPRansac : testing::TestWithParam<cv::gpu::DeviceInfo>
+{
+    cv::gpu::DeviceInfo devInfo;
+
+    virtual void SetUp()
+    {
+        devInfo = GetParam();
+
+        cv::gpu::setDevice(devInfo.deviceID());
+    }
+};
+
+TEST_P(SolvePnPRansac, Accuracy)
+{
+    cv::Mat object = randomMat(cv::Size(5000, 1), CV_32FC3, 0, 100);
+    cv::Mat camera_mat = randomMat(cv::Size(3, 3), CV_32F, 0.5, 1);
+    camera_mat.at<float>(0, 1) = 0.f;
+    camera_mat.at<float>(1, 0) = 0.f;
+    camera_mat.at<float>(2, 0) = 0.f;
+    camera_mat.at<float>(2, 1) = 0.f;
+
+    std::vector<cv::Point2f> image_vec;
+    cv::Mat rvec_gold;
+    cv::Mat tvec_gold;
+    rvec_gold = randomMat(cv::Size(3, 1), CV_32F, 0, 1);
+    tvec_gold = randomMat(cv::Size(3, 1), CV_32F, 0, 1);
+    cv::projectPoints(object, rvec_gold, tvec_gold, camera_mat, cv::Mat(1, 8, CV_32F, cv::Scalar::all(0)), image_vec);
+
+    cv::Mat rvec, tvec;
+    std::vector<int> inliers;
+    cv::gpu::solvePnPRansac(object, cv::Mat(1, (int)image_vec.size(), CV_32FC2, &image_vec[0]),
+                            camera_mat, cv::Mat(1, 8, CV_32F, cv::Scalar::all(0)),
+                            rvec, tvec, false, 200, 2.f, 100, &inliers);
+
+    ASSERT_LE(cv::norm(rvec - rvec_gold), 1e-3);
+    ASSERT_LE(cv::norm(tvec - tvec_gold), 1e-3);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Calib3D, SolvePnPRansac, ALL_DEVICES);
+
+////////////////////////////////////////////////////////////////////////////////
+// reprojectImageTo3D
+
+PARAM_TEST_CASE(ReprojectImageTo3D, cv::gpu::DeviceInfo, cv::Size, MatDepth, UseRoi)
+{
+    cv::gpu::DeviceInfo devInfo;
+    cv::Size size;
+    int depth;
+    bool useRoi;
+
+    virtual void SetUp()
+    {
+        devInfo = GET_PARAM(0);
+        size = GET_PARAM(1);
+        depth = GET_PARAM(2);
+        useRoi = GET_PARAM(3);
+
+        cv::gpu::setDevice(devInfo.deviceID());
+    }
+};
+
+TEST_P(ReprojectImageTo3D, Accuracy)
+{
+    cv::Mat disp = randomMat(size, depth, 5.0, 30.0);
+    cv::Mat Q = randomMat(cv::Size(4, 4), CV_32FC1, 0.1, 1.0);
+
+    cv::gpu::GpuMat dst;
+    cv::gpu::reprojectImageTo3D(loadMat(disp, useRoi), dst, Q, 3);
+    
+    cv::Mat dst_gold;
+    cv::reprojectImageTo3D(disp, dst_gold, Q, false);
+
+    EXPECT_MAT_NEAR(dst_gold, dst, 1e-5);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Calib3D, ReprojectImageTo3D, testing::Combine(
+    ALL_DEVICES,
+    DIFFERENT_SIZES,
+    testing::Values(MatDepth(CV_8U), MatDepth(CV_16S)),
+    WHOLE_SUBMAT));
+
+} // namespace

@@ -12,7 +12,7 @@ import getopt
 import operator
 import functools
 
-import cv
+import cv2.cv as cv
 
 class OpenCVTests(unittest.TestCase):
 
@@ -69,7 +69,7 @@ class OpenCVTests(unittest.TestCase):
 
     def get_sample(self, filename, iscolor = cv.CV_LOAD_IMAGE_COLOR):
         if not filename in self.image_cache:
-            filedata = urllib.urlopen("https://code.ros.org/svn/opencv/trunk/opencv/" + filename).read()
+            filedata = urllib.urlopen("http://code.opencv.org/svn/opencv/trunk/opencv/" + filename).read()
             imagefiledata = cv.CreateMatHeader(1, len(filedata), cv.CV_8UC1)
             cv.SetData(imagefiledata, filedata, len(filedata))
             self.image_cache[filename] = cv.DecodeImageM(imagefiledata, iscolor)
@@ -239,7 +239,7 @@ class FunctionTests(OpenCVTests):
         a = self.get_sample("samples/c/lena.jpg", 0)
         b = self.get_sample("samples/c/lena.jpg", 0)
         (w,h) = cv.GetSize(a)
-        vel_size = (w - 8, h - 8)
+        vel_size = (w - 8 + 1, h - 8 + 1)
         velx = cv.CreateImage(vel_size, cv.IPL_DEPTH_32F, 1)
         vely = cv.CreateImage(vel_size, cv.IPL_DEPTH_32F, 1)
         cv.CalcOpticalFlowBM(a, b, (8,8), (1,1), (8,8), 0, velx, vely)
@@ -659,7 +659,7 @@ class FunctionTests(OpenCVTests):
         self.assert_(li[0] != None)
 
     def test_InPaint(self):
-        src = self.get_sample("doc/pics/building.jpg")
+        src = self.get_sample("samples/cpp/building.jpg")
         msk = cv.CreateImage(cv.GetSize(src), cv.IPL_DEPTH_8U, 1)
         damaged = cv.CloneMat(src)
         repaired = cv.CreateImage(cv.GetSize(src), cv.IPL_DEPTH_8U, 3)
@@ -866,7 +866,7 @@ class FunctionTests(OpenCVTests):
 
     def yield_line_image(self):
         """ Needed by HoughLines tests """
-        src = self.get_sample("doc/pics/building.jpg", 0)
+        src = self.get_sample("samples/cpp/building.jpg", 0)
         dst = cv.CreateImage(cv.GetSize(src), 8, 1)
         cv.Canny(src, dst, 50, 200, 3)
         return dst
@@ -940,8 +940,8 @@ class AreaTests(OpenCVTests):
 
             # Using an array object for a CvArr parameter
             ones = numpy.ones((640, 480))
-            r = numpy.ones((640, 480))
-            cv.AddS(ones, 7, r)
+            r = cv.fromarray(numpy.ones((640, 480)))
+            cv.AddS(cv.fromarray(ones), 7, r)
             self.assert_(numpy.alltrue(r == (8 * ones)))
 
             # create arrays, use them in OpenCV and replace the the array
@@ -958,11 +958,12 @@ class AreaTests(OpenCVTests):
 
             # 
             m = numpy.identity(4, dtype = numpy.float32)
+            m = cv.fromarray(m[:3, :3])
             rvec = cv.CreateMat(3, 1, cv.CV_32FC1)
             rvec[0,0] = 1
             rvec[1,0] = 1
             rvec[2,0] = 1
-            cv.Rodrigues2(rvec, m[:3,:3])
+            cv.Rodrigues2(rvec, m)
 	    #print m
 
         else:
@@ -1076,6 +1077,68 @@ class AreaTests(OpenCVTests):
 
         for meth,expected in [(cv.CV_COMP_CORREL, 1.0), (cv.CV_COMP_CHISQR, 0.0), (cv.CV_COMP_INTERSECT, 1.0), (cv.CV_COMP_BHATTACHARYYA, 0.0)]:
             self.assertEqual(cv.CompareHist(h, h, meth), expected)
+
+    def test_remap(self):
+        rng = cv.RNG(0)
+        maxError = 1e-6
+        raw = cv.CreateImage((640, 480), cv.IPL_DEPTH_8U, 1)
+        for x in range(0, 640, 20):
+            cv.Line(raw, (x,0), (x,480), 255, 1)
+        for y in range(0, 480, 20):
+            cv.Line(raw, (0,y), (640,y), 255, 1)
+        intrinsic_mat = cv.CreateMat(3, 3, cv.CV_32FC1)
+        distortion_coeffs = cv.CreateMat(1, 4, cv.CV_32FC1)
+
+        cv.SetZero(intrinsic_mat)
+        intrinsic_mat[0,2] = 320.0
+        intrinsic_mat[1,2] = 240.0
+        intrinsic_mat[0,0] = 320.0
+        intrinsic_mat[1,1] = 320.0
+        intrinsic_mat[2,2] = 1.0
+        cv.SetZero(distortion_coeffs)
+        distortion_coeffs[0,0] = 1e-1
+        mapx = cv.CreateImage((640, 480), cv.IPL_DEPTH_32F, 1)
+        mapy = cv.CreateImage((640, 480), cv.IPL_DEPTH_32F, 1)
+        cv.SetZero(mapx)
+        cv.SetZero(mapy)
+        cv.InitUndistortMap(intrinsic_mat, distortion_coeffs, mapx, mapy)
+        rect = cv.CreateImage((640, 480), cv.IPL_DEPTH_8U, 1)
+
+        (w,h) = (640,480)
+        rMapxy = cv.CreateMat(h, w, cv.CV_16SC2)
+        rMapa  = cv.CreateMat(h, w, cv.CV_16UC1)
+        cv.ConvertMaps(mapx,mapy,rMapxy,rMapa)
+
+        cv.Remap(raw, rect, mapx, mapy)
+        cv.Remap(raw, rect, rMapxy, rMapa)
+        cv.Undistort2(raw, rect, intrinsic_mat, distortion_coeffs)
+
+        for w in [1, 4, 4095, 4096, 4097, 4100]:
+            p = cv.CreateImage((w,256), 8, 1)
+            up = cv.CreateImage((w,256), 8, 1)
+            cv.Undistort2(p, up, intrinsic_mat, distortion_coeffs)
+
+        fptypes = [cv.CV_32FC1, cv.CV_64FC1]
+        pointsCount = 7
+        for t0 in fptypes:
+            for t1 in fptypes:
+                for t2 in fptypes:
+                    for t3 in fptypes:
+                        rotation_vector = cv.CreateMat(1, 3, t0)
+                        translation_vector = cv.CreateMat(1, 3, t1)
+                        cv.RandArr(rng, rotation_vector, cv.CV_RAND_UNI, -1.0, 1.0)
+                        cv.RandArr(rng, translation_vector, cv.CV_RAND_UNI, -1.0, 1.0)
+                        object_points = cv.CreateMat(pointsCount, 3, t2)
+                        image_points = cv.CreateMat(pointsCount, 2, t3)
+                        cv.RandArr(rng, object_points, cv.CV_RAND_UNI, -100.0, 100.0)
+                        cv.ProjectPoints2(object_points, rotation_vector, translation_vector, intrinsic_mat, distortion_coeffs, image_points)
+
+                        reshaped_object_points = cv.Reshape(object_points, 1, 3)
+                        reshaped_image_points = cv.CreateMat(2, pointsCount, t3)
+                        cv.ProjectPoints2(object_points, rotation_vector, translation_vector, intrinsic_mat, distortion_coeffs, reshaped_image_points)
+
+                        error = cv.Norm(reshaped_image_points, cv.Reshape(image_points, 1, 2))
+                        self.assert_(error < maxError)
 
     def test_arithmetic(self):
         a = cv.CreateMat(4, 4, cv.CV_8UC1)
@@ -1582,7 +1645,7 @@ class AreaTests(OpenCVTests):
             cv.SetData(imagefiledata, filedata, len(filedata))
             return cv.DecodeImageM(imagefiledata)
 
-        urllib.urlretrieve("http://pr.willowgarage.com/data/camera_calibration/camera_calibration.tar.gz", "camera_calibration.tar.gz")
+        urllib.urlretrieve("http://opencv.itseez.com/data/camera_calibration.tar.gz", "camera_calibration.tar.gz")
         tf = tarfile.open("camera_calibration.tar.gz")
 
         num_x_ints = 8
@@ -2104,11 +2167,11 @@ class DocumentFragmentTests(OpenCVTests):
     """ Test the fragments of code that are included in the documentation """
     def setUp(self):
         OpenCVTests.setUp(self)
-        sys.path.append("../doc/python_fragments")
+        sys.path.append(".")
 
     def test_precornerdetect(self):
         from precornerdetect import precornerdetect
-        im = self.get_sample("samples/c/right01.jpg", 0)
+        im = self.get_sample("samples/cpp/right01.jpg", 0)
         imf = cv.CreateMat(im.rows, im.cols, cv.CV_32FC1)
         cv.ConvertScale(im, imf)
         (r0,r1) = precornerdetect(imf)
@@ -2118,7 +2181,7 @@ class DocumentFragmentTests(OpenCVTests):
 
     def test_findstereocorrespondence(self):
         from findstereocorrespondence import findstereocorrespondence
-        (l,r) = [self.get_sample("doc/pics/tsukuba_%s.png" % c, cv.CV_LOAD_IMAGE_GRAYSCALE) for c in "lr"]
+        (l,r) = [self.get_sample("samples/cpp/tsukuba_%s.png" % c, cv.CV_LOAD_IMAGE_GRAYSCALE) for c in "lr"]
 
         (disparity_left, disparity_right) = findstereocorrespondence(l, r)
 
@@ -2129,7 +2192,7 @@ class DocumentFragmentTests(OpenCVTests):
     def test_calchist(self):
         from calchist import hs_histogram
         i1 = self.get_sample("samples/c/lena.jpg")
-        i2 = self.get_sample("doc/pics/building.jpg")
+        i2 = self.get_sample("samples/cpp/building.jpg")
         i3 = cv.CloneMat(i1)
         cv.Flip(i3, i3, 1)
         h1 = hs_histogram(i1)

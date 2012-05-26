@@ -5,7 +5,7 @@ print "OpenCV Python version of lkdemo"
 import sys
 
 # import the necessary things for OpenCV
-import cv
+import cv2.cv as cv
 
 #############################################################################
 # some "constants"
@@ -189,3 +189,4 @@ if __name__ == '__main__':
               night_mode = not night_mode
           elif cc == ' ':
               fc = (fc + 1) % len(frames)
+    cv.DestroyAllWindows()

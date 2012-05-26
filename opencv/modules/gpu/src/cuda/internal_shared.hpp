@@ -43,108 +43,62 @@
 #ifndef __OPENCV_internal_shared_HPP__
 #define __OPENCV_internal_shared_HPP__
 
+#include <cuda_runtime.h>
+#include <npp.h>
+#include "NPP_staging.hpp"
 #include "opencv2/gpu/devmem2d.hpp"
 #include "safe_call.hpp"
-#include "cuda_runtime.h"
-#include "npp.h"
-#include "NPP_staging.hpp"
+#include "opencv2/gpu/device/common.hpp"
 
-namespace cv
+namespace cv { namespace gpu 
 {
-    namespace gpu
+    enum 
     {
-        typedef unsigned char uchar;
-        typedef signed char schar;
-        typedef unsigned short ushort;
-        typedef unsigned int uint;       
-
-        enum 
-        {
-            BORDER_REFLECT101_GPU = 0,
-            BORDER_REPLICATE_GPU,
-            BORDER_CONSTANT_GPU
-        };
-                
-        // Converts CPU border extrapolation mode into GPU internal analogue.
-        // Returns true if the GPU analogue exists, false otherwise.
-        bool tryConvertToGpuBorderType(int cpuBorderType, int& gpuBorderType);
-
-
-        static inline int divUp(int total, int grain) { return (total + grain - 1) / grain; }
-
-        template<class T> static inline void uploadConstant(const char* name, const T& value) 
-        { 
-            cudaSafeCall( cudaMemcpyToSymbol(name, &value, sizeof(T)) ); 
-        }
-
-        template<class T> static inline void uploadConstant(const char* name, const T& value, cudaStream_t stream) 
-        {
-            cudaSafeCall( cudaMemcpyToSymbolAsync(name, &value, sizeof(T), 0, cudaMemcpyHostToDevice, stream) ); 
-        }        
-
-        template<class T> static inline void bindTexture(const char* name, const DevMem2D_<T>& img/*, bool normalized = false,
-            enum cudaTextureFilterMode filterMode = cudaFilterModePoint, enum cudaTextureAddressMode addrMode = cudaAddressModeClamp*/)
-        {            
-            //!!!! const_cast is disabled!
-            //!!!! Please use constructor of 'class texture'  instead.
-
-            //textureReference* tex; 
-            //cudaSafeCall( cudaGetTextureReference((const textureReference**)&tex, name) ); 
-            //tex->normalized = normalized;
-            //tex->filterMode = filterMode;
-            //tex->addressMode[0] = addrMode;
-            //tex->addressMode[1] = addrMode;
+        BORDER_REFLECT101_GPU = 0,
+        BORDER_REPLICATE_GPU,
+        BORDER_CONSTANT_GPU,
+        BORDER_REFLECT_GPU,
+        BORDER_WRAP_GPU
+    };
             
-            const textureReference* tex; 
-            cudaSafeCall( cudaGetTextureReference(&tex, name) ); 
+    // Converts CPU border extrapolation mode into GPU internal analogue.
+    // Returns true if the GPU analogue exists, false otherwise.
+    bool tryConvertToGpuBorderType(int cpuBorderType, int& gpuBorderType);
 
-            cudaChannelFormatDesc desc = cudaCreateChannelDesc<T>();
-            cudaSafeCall( cudaBindTexture2D(0, tex, img.ptr(), &desc, img.cols, img.rows, img.step) );
+    class NppStreamHandler
+    {
+    public:
+        inline explicit NppStreamHandler(cudaStream_t newStream = 0)
+        {
+            oldStream = nppGetStream();
+            nppSetStream(newStream);
         }
 
-        static inline void unbindTexture(const char *name)
+        inline ~NppStreamHandler()
         {
-            const textureReference* tex; 
-            cudaSafeCall( cudaGetTextureReference(&tex, name) ); 
-            cudaSafeCall( cudaUnbindTexture(tex) );
+            nppSetStream(oldStream);
         }
 
-        class NppStreamHandler
+    private:
+        cudaStream_t oldStream;
+    };
+
+    class NppStStreamHandler
+    {
+    public:
+        inline explicit NppStStreamHandler(cudaStream_t newStream = 0)
         {
-        public:
-            inline explicit NppStreamHandler(cudaStream_t newStream = 0)
-            {
-                oldStream = nppGetStream();
-                nppSetStream(newStream);
-            }
+            oldStream = nppStSetActiveCUDAstream(newStream);
+        }
 
-            inline ~NppStreamHandler()
-            {
-                nppSetStream(oldStream);
-            }
-
-        private:
-            cudaStream_t oldStream;
-        };
-
-        class NppStStreamHandler
+        inline ~NppStStreamHandler()
         {
-        public:
-            inline explicit NppStStreamHandler(cudaStream_t newStream = 0)
-            {
-                oldStream = nppStSetActiveCUDAstream(newStream);
-            }
+            nppStSetActiveCUDAstream(oldStream);
+        }
 
-            inline ~NppStStreamHandler()
-            {
-                nppStSetActiveCUDAstream(oldStream);
-            }
-
-        private:
-            cudaStream_t oldStream;
-        };
-    }
-}
-
+    private:
+        cudaStream_t oldStream;
+    };
+}}
 
 #endif /* __OPENCV_internal_shared_HPP__ */

@@ -3,7 +3,7 @@
 print "OpenCV Python version of contours"
 
 # import the necessary things for OpenCV
-import cv
+import cv2.cv as cv
 
 # some default constants
 _SIZE = 500
@@ -133,3 +133,4 @@ if __name__ == '__main__':
 
     # wait a key pressed to end
     cv.WaitKey (0)
+    cv.DestroyAllWindows()

@@ -96,6 +96,13 @@ void  ExrDecoder::close()
     }
 }
 
+
+int  ExrDecoder::type() const
+{
+    return CV_MAKETYPE((m_isfloat ? CV_32F : CV_32S), m_iscolor ? 3 : 1);
+}
+
+
 bool  ExrDecoder::readHeader()
 {
     bool result = false;
@@ -174,7 +181,9 @@ bool  ExrDecoder::readHeader()
 
 bool  ExrDecoder::readData( Mat& img )
 {
+    m_native_depth = CV_MAT_DEPTH(type()) == img.depth();
     bool color = img.channels() > 1;
+    
     uchar* data = img.data;
     int step = img.step;
     bool justcopy = m_native_depth;
@@ -580,7 +589,7 @@ bool  ExrEncoder::write( const Mat& img, const vector<int>& )
     int step = img.step;
 
     Header header( width, height );
-    PixelType type;
+    Imf::PixelType type;
 
     if(depth == 8)
         type = HALF;
@@ -710,7 +719,7 @@ bool  ExrEncoder::write( const Mat& img, const vector<int>& )
             }
             data += step;
         }
-        delete buffer;
+        delete[] buffer;
     }
 
     return result;

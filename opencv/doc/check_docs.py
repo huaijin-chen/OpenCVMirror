@@ -82,7 +82,10 @@ class RSTParser(object):
             lineno += 1
             ll = l.strip()
             if balance == 0:
-                if not ll.startswith(".. c:function::") and not ll.startswith(".. cpp:function::"):
+                if not ll.startswith(".. c:function::") and \
+                   not ll.startswith(".. cpp:function::") and \
+                   not ll.startswith(".. ocv:function::") and \
+                   not ll.startswith(".. ocv:cfunction::"):
                     continue
                 fdecl = ll[ll.find("::") + 3:]
             elif balance > 0:

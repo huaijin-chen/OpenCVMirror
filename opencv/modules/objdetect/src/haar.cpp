@@ -184,7 +184,7 @@ icvCreateHidHaarClassifierCascade( CvHaarClassifierCascade* cascade )
     int datasize;
     int total_classifiers = 0;
     int total_nodes = 0;
-    char errorstr[100];
+    char errorstr[1000];
     CvHidHaarClassifier* haar_classifier_ptr;
     CvHidHaarTreeNode* haar_node_ptr;
     CvSize orig_window_size;
@@ -657,8 +657,6 @@ CV_IMPL int
 cvRunHaarClassifierCascadeSum( const CvHaarClassifierCascade* _cascade,
                                CvPoint pt, double& stage_sum, int start_stage )
 {
-    int result = -1;
-
     int p_offset, pq_offset;
     int i, j;
     double mean, variance_norm_factor;
@@ -690,11 +688,8 @@ cvRunHaarClassifierCascadeSum( const CvHaarClassifierCascade* _cascade,
 
     if( cascade->is_tree )
     {
-        CvHidHaarStageClassifier* ptr;
+        CvHidHaarStageClassifier* ptr = cascade->stage_classifier;
         assert( start_stage == 0 );
-
-        result = 1;
-        ptr = cascade->stage_classifier;
 
         while( ptr )
         {
@@ -850,6 +845,10 @@ struct HaarDetectObjects_ScaleImage_Invoker
         Size winSize0 = cascade->orig_window_size;
         Size winSize(cvRound(winSize0.width*factor), cvRound(winSize0.height*factor));
         int y1 = range.begin()*stripSize, y2 = min(range.end()*stripSize, sum1.rows - 1 - winSize0.height);
+        
+        if (y2 <= y1 || sum1.cols <= 1 + winSize0.width)
+            return;
+        
         Size ssz(sum1.cols - 1 - winSize0.width, y2 - y1);
         int x, y, ystep = factor > 2 ? 1 : 2;
         
@@ -1033,12 +1032,6 @@ cvHaarDetectObjectsForROC( const CvArr* _img,
     bool findBiggestObject = (flags & CV_HAAR_FIND_BIGGEST_OBJECT) != 0;
     bool roughSearch = (flags & CV_HAAR_DO_ROUGH_SEARCH) != 0;
 
-    if( maxSize.height == 0 || maxSize.width == 0 )
-    {
-        maxSize.height = img->rows;
-        maxSize.width = img->cols;
-    }
-
     if( !CV_IS_HAAR_CLASSIFIER(cascade) )
         CV_Error( !cascade ? CV_StsNullPtr : CV_StsBadArg, "Invalid classifier cascade" );
 
@@ -1057,6 +1050,12 @@ cvHaarDetectObjectsForROC( const CvArr* _img,
 
     if( findBiggestObject )
         flags &= ~CV_HAAR_SCALE_IMAGE;
+    
+    if( maxSize.height == 0 || maxSize.width == 0 )
+    {
+        maxSize.height = img->rows;
+        maxSize.width = img->cols;
+    }
 
     temp = cvCreateMat( img->rows, img->cols, CV_8UC1 );
     sum = cvCreateMat( img->rows + 1, img->cols + 1, CV_32SC1 );
@@ -1501,7 +1500,8 @@ cvLoadHaarClassifierCascade( const char* directory, CvSize orig_window_size )
         fseek( f, 0, SEEK_END );
         size = ftell( f );
         fseek( f, 0, SEEK_SET );
-        fread( ptr, 1, size, f );
+        size_t elements_read = fread( ptr, 1, size, f );
+        CV_Assert(elements_read == (size_t)(size));
         fclose(f);
         input_cascade[i] = ptr;
         ptr += size;

@@ -7,7 +7,11 @@ gen_template_check_self = Template("""    if(!PyObject_TypeCheck(self, &pyopencv
 """)
 
 gen_template_call_constructor = Template("""self = PyObject_NEW(pyopencv_${name}_t, &pyopencv_${name}_Type);
-        if(self) ERRWRAP2(self->v = $op$cname""")
+        new (&(self->v)) Ptr<$cname>(); // init Ptr with placement new
+        if(self) ERRWRAP2(self->v = new $cname""")
+
+gen_template_simple_call_constructor = Template("""self = PyObject_NEW(pyopencv_${name}_t, &pyopencv_${name}_Type);
+        if(self) ERRWRAP2(self->v = $cname""")
 
 gen_template_parse_args = Template("""const char* keywords[] = { $kw_list, NULL };
     if( PyArg_ParseTupleAndKeywords(args, kw, "$fmtspec", (char**)keywords, $parse_arglist)$code_cvt )""")
@@ -66,7 +70,7 @@ gen_template_type_decl = Template("""
 struct pyopencv_${name}_t
 {
     PyObject_HEAD
-    ${cname}* v;
+    Ptr<${cname}> v;
 };
 
 static PyTypeObject pyopencv_${name}_Type =
@@ -79,9 +83,31 @@ static PyTypeObject pyopencv_${name}_Type =
 
 static void pyopencv_${name}_dealloc(PyObject* self)
 {
-    delete ((pyopencv_${name}_t*)self)->v;
+    ((pyopencv_${name}_t*)self)->v = NULL;
     PyObject_Del(self);
 }
+
+static PyObject* pyopencv_from(const Ptr<${cname}>& r)
+{
+    pyopencv_${name}_t *m = PyObject_NEW(pyopencv_${name}_t, &pyopencv_${name}_Type);
+    new (&(m->v)) Ptr<$cname>(); // init Ptr with placement new
+    m->v = r;
+    return (PyObject*)m;
+}
+
+static bool pyopencv_to(PyObject* src, Ptr<${cname}>& dst, const char* name="<unknown>")
+{
+    if( src == NULL || src == Py_None )
+        return true;
+    if(!PyObject_TypeCheck(src, &pyopencv_${name}_Type))
+    {
+        failmsg("Expected ${cname} for argument '%s'", name);
+        return false;
+    }
+    dst = ((pyopencv_${name}_t*)src)->v;
+    return true;
+}
+
 """)
 
 gen_template_map_type_cvt = Template("""
@@ -164,6 +190,9 @@ simple_argtype_mapping = {
     "c_string": ("char*", "s", '(char*)""')
 }
 
+def normalize_class_name(name):
+    return re.sub(r"^cv\.", "", name).replace(".", "_")
+
 class ClassProp(object):
     def __init__(self, decl):
         self.tp = decl[0].replace("*", "_ptr")
@@ -175,7 +204,7 @@ class ClassProp(object):
 class ClassInfo(object):
     def __init__(self, name, decl=None):
         self.cname = name.replace(".", "::")
-        self.name = self.wname = re.sub(r"^cv\.", "", name)
+        self.name = self.wname = normalize_class_name(name)
         self.ismap = False
         self.issimple = False
         self.methods = {}
@@ -186,9 +215,11 @@ class ClassInfo(object):
         if decl:
             self.bases = decl[1].split()[1:]
             if len(self.bases) > 1:
-                print "Error: class %s has more than 1 base class (not supported by Python C extensions)" % (self.name,)
+                print "Warning: class %s has more than 1 base class (not supported by Python C extensions)" % (self.name,)
                 print "Bases: ", self.bases
-                return sys.exit(-1)
+                print "Only the first base class will be used"
+                self.bases = self.bases[:1]
+                #return sys.exit(-1)
             for m in decl[2]:
                 if m.startswith("="):
                     self.wname = m[1:]
@@ -275,10 +306,12 @@ class ArgInfo(object):
         self.arraycvt = None
         self.inputarg = True
         self.outputarg = False
+        self.returnarg = False
         for m in arg_tuple[3]:
             if m == "/O":
                 self.inputarg = False
                 self.outputarg = True
+                self.returnarg = True
             elif m == "/IO":
                 self.inputarg = True
                 self.outputarg = True
@@ -300,8 +333,12 @@ class FuncVariant(object):
         self.classname = classname
         self.name = self.wname = name
         self.isconstructor = isconstructor
-        if self.isconstructor and self.wname.startswith("Cv"):
-            self.wname = self.wname[2:]
+        if self.isconstructor:
+            if self.wname.startswith("Cv"):
+                self.wname = self.wname[2:]
+            else:
+                self.wname = self.classname
+            
         self.rettype = decl[1]
         if self.rettype == "void":
             self.rettype = ""
@@ -346,11 +383,12 @@ class FuncVariant(object):
             argno += 1
             if a.name in self.array_counters:
                 continue
-            if a.outputarg:
+            if a.returnarg:
                 outlist.append((a.name, argno))
+            if (not a.inputarg or a.returnarg) and a.isbig():
+                outarr_list.append((a.name, argno))
+                continue
             if not a.inputarg:
-                if a.isbig():
-                    outarr_list.append((a.name, argno))
                 continue
             if not a.defval:
                 arglist.append((a.name, argno))
@@ -443,7 +481,10 @@ class FuncInfo(object):
         # we write ClassName([args ...]) -> object
         if have_empty_constructor and len(self.variants) == 2:
             idx = self.variants[1].py_arglist != []
-            docstring_list = ["[" + self.variants[idx].py_docstring + "]"]
+            s = self.variants[idx].py_docstring
+            p1 = s.find("(")
+            p2 = s.rfind(")")
+            docstring_list = [s[:p1+1] + "[" + s[p1+1:p2] + "]" + s[p2:]]
             
         return Template('    {"$py_funcname", (PyCFunction)$wrap_funcname, METH_KEYWORDS, "$py_docstring"},\n'
                         ).substitute(py_funcname = self.variants[0].wname, wrap_funcname=self.get_wrapper_name(),
@@ -477,10 +518,10 @@ class FuncInfo(object):
 
             if self.isconstructor:
                 code_decl += "    pyopencv_%s_t* self = 0;\n" % selfinfo.name
-                op = "new "
+                templ = gen_template_call_constructor
                 if selfinfo.issimple:
-                    op = ""
-                code_fcall = gen_template_call_constructor.substitute(name=selfinfo.name, cname=selfinfo.cname, op=op)
+                    templ = gen_template_simple_call_constructor
+                code_fcall = templ.substitute(name=selfinfo.name, cname=selfinfo.cname)
             else:
                 code_fcall = "ERRWRAP2( "
                 if v.rettype:
@@ -554,7 +595,7 @@ class FuncInfo(object):
                 amapping = simple_argtype_mapping.get(tp, (tp, "O", "0"))
                 all_cargs.append(amapping)
 
-            if v.args:
+            if v.args and v.py_arglist:
                 # form the format spec for PyArg_ParseTupleAndKeywords
                 fmtspec = "".join([all_cargs[argno][0][1] for aname, argno in v.py_arglist])
                 if v.py_noptargs > 0:
@@ -640,15 +681,19 @@ class PythonWrapperGenerator(object):
         self.consts[constinfo.name] = constinfo
 
     def add_func(self, decl):
-        classname = ""
+        classname = bareclassname = ""
         name = decl[0]
         dpos = name.rfind(".")
         if dpos >= 0 and name[:dpos] != "cv":
-            classname = re.sub(r"^cv\.", "", name[:dpos])
+            classname = bareclassname = re.sub(r"^cv\.", "", name[:dpos])
             name = name[dpos+1:]
+            dpos = classname.rfind(".")
+            if dpos >= 0:
+                bareclassname = classname[dpos+1:]
+                classname = classname.replace(".", "_")
         cname = name
         name = re.sub(r"^cv\.", "", name)
-        isconstructor = cname == classname
+        isconstructor = cname == bareclassname
         cname = cname.replace(".", "::")
         isclassmethod = False
         customname = False

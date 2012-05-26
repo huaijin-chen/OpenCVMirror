@@ -6,19 +6,15 @@ Common Interfaces of Descriptor Matchers
 Matchers of keypoint descriptors in OpenCV have wrappers with a common interface that enables you to easily switch
 between different algorithms solving the same problem. This section is devoted to matching descriptors
 that are represented as vectors in a multidimensional space. All objects that implement ``vector``
-descriptor matchers inherit
-:ref:`DescriptorMatcher` interface.
-
-.. index:: DMatch
-
-.. _DMatch:
+descriptor matchers inherit the
+:ocv:class:`DescriptorMatcher` interface.
 
 DMatch
 ------
-.. cpp:class:: DMatch
+.. ocv:class:: DMatch
 
 Class for matching keypoint descriptors: query descriptor index,
-train descriptor index, train image index, and distance between descriptors ::
+train descriptor index, train image index, and distance between descriptors. ::
 
     struct DMatch
     {
@@ -42,13 +38,9 @@ train descriptor index, train image index, and distance between descriptors ::
     };
 
 
-.. index:: DescriptorMatcher
-
-.. _DescriptorMatcher:
-
 DescriptorMatcher
 -----------------
-.. c:type:: DescriptorMatcher
+.. ocv:class:: DescriptorMatcher
 
 Abstract base class for matching keypoint descriptors. It has two groups
 of match methods: for matching descriptors of an image with another image or
@@ -104,65 +96,66 @@ with an image set. ::
     };
 
 
-.. index:: DescriptorMatcher::add
-
 DescriptorMatcher::add
 --------------------------
-.. cpp:function:: void add( const vector<Mat>& descriptors )
+Adds descriptors to train a descriptor collection. If the collection ``trainDescCollectionis`` is not empty, the new descriptors are added to existing train descriptors.
 
-    Adds descriptors to train a descriptor collection. If the collection ``trainDescCollectionis`` is not empty, the new descriptors are added to existing train descriptors.
+.. ocv:function:: void DescriptorMatcher::add( const vector<Mat>& descriptors )
 
     :param descriptors: Descriptors to add. Each  ``descriptors[i]``  is a set of descriptors from the same train image.
 
-.. index:: DescriptorMatcher::getTrainDescriptors
 
 DescriptorMatcher::getTrainDescriptors
 ------------------------------------------
-.. cpp:function:: const vector<Mat>& getTrainDescriptors() const
+Returns a constant link to the train descriptor collection ``trainDescCollection`` .
 
-    Returns a constant link to the train descriptor collection ``trainDescCollection`` .
+.. ocv:function:: const vector<Mat>& DescriptorMatcher::getTrainDescriptors() const
 
-.. index:: DescriptorMatcher::clear
+    
+
+
 
 DescriptorMatcher::clear
 ----------------------------
-.. cpp:function:: void DescriptorMatcher::clear()
+Clears the train descriptor collection.
 
-    Clears the train descriptor collection.
+.. ocv:function:: void DescriptorMatcher::clear()
 
-.. index:: DescriptorMatcher::empty
+
 
 DescriptorMatcher::empty
 ----------------------------
-.. cpp:function:: bool DescriptorMatcher::empty() const
+Returns true if there are no train descriptors in the collection.
 
-    Returns true if there are no train descriptors in the collection.
+.. ocv:function:: bool DescriptorMatcher::empty() const
 
-.. index:: DescriptorMatcher::isMaskSupported
+
 
 DescriptorMatcher::isMaskSupported
 --------------------------------------
-.. cpp:function:: bool DescriptorMatcher::isMaskSupported()
+Returns true if the descriptor matcher supports masking permissible matches.
 
-    Returns true if the descriptor matcher supports masking permissible matches.
+.. ocv:function:: bool DescriptorMatcher::isMaskSupported()
 
-.. index:: DescriptorMatcher::train
+
 
 DescriptorMatcher::train
 ----------------------------
-.. cpp:function:: void DescriptorMatcher::train()
+Trains a descriptor matcher
 
-    Trains a descriptor matcher (for example, the flann index). In all methods to match, the method ``train()`` is run every time before matching. Some descriptor matchers (for example, ``BruteForceMatcher``) have an empty implementation of this method. Other matchers really train their inner structures (for example, ``FlannBasedMatcher`` trains ``flann::Index`` ).
+.. ocv:function:: void DescriptorMatcher::train()
 
-.. index:: DescriptorMatcher::match
+Trains a descriptor matcher (for example, the flann index). In all methods to match, the method ``train()`` is run every time before matching. Some descriptor matchers (for example, ``BruteForceMatcher``) have an empty implementation of this method. Other matchers really train their inner structures (for example, ``FlannBasedMatcher`` trains ``flann::Index`` ).
+
+
 
 DescriptorMatcher::match
 ----------------------------
-.. cpp:function:: void DescriptorMatcher::match( const Mat& queryDescriptors,                           const Mat& trainDescriptors, vector<DMatch>& matches, const Mat& mask=Mat() ) const
+Finds the best match for each descriptor from a query set.
 
-.. cpp:function:: void DescriptorMatcher::match( const Mat& queryDescriptors,                                   vector<DMatch>& matches, const vector<Mat>& masks=vector<Mat>() )
+.. ocv:function:: void DescriptorMatcher::match( const Mat& queryDescriptors, const Mat& trainDescriptors, vector<DMatch>& matches, const Mat& mask=Mat() ) const
 
-    Finds the best match for each descriptor from a query set.
+.. ocv:function:: void DescriptorMatcher::match( const Mat& queryDescriptors, vector<DMatch>& matches, const vector<Mat>& masks=vector<Mat>() )
 
     :param queryDescriptors: Query set of descriptors.
 
@@ -176,15 +169,15 @@ DescriptorMatcher::match
 
 In the first variant of this method, the train descriptors are passed as an input argument. In the second variant of the method, train descriptors collection that was set by ``DescriptorMatcher::add`` is used. Optional mask (or masks) can be passed to specify which query and training descriptors can be matched. Namely, ``queryDescriptors[i]`` can be matched with ``trainDescriptors[j]`` only if ``mask.at<uchar>(i,j)`` is non-zero. 
 
-.. index:: DescriptorMatcher::knnMatch
+
 
 DescriptorMatcher::knnMatch
 -------------------------------
-.. cpp:function:: void DescriptorMatcher::knnMatch( const Mat& queryDescriptors,       const Mat& trainDescriptors,       vector<vector<DMatch> >& matches,       int k, const Mat& mask=Mat(),       bool compactResult=false ) const
+Finds the k best matches for each descriptor from a query set.
 
-.. cpp:function:: void DescriptorMatcher::knnMatch( const Mat& queryDescriptors,           vector<vector<DMatch> >& matches, int k,      const vector<Mat>& masks=vector<Mat>(),       bool compactResult=false )
+.. ocv:function:: void DescriptorMatcher::knnMatch( const Mat& queryDescriptors,       const Mat& trainDescriptors,       vector<vector<DMatch> >& matches,       int k, const Mat& mask=Mat(),       bool compactResult=false ) const
 
-    Finds the k best matches for each descriptor from a query set.
+.. ocv:function:: void DescriptorMatcher::knnMatch( const Mat& queryDescriptors,           vector<vector<DMatch> >& matches, int k,      const vector<Mat>& masks=vector<Mat>(),       bool compactResult=false )
 
     :param queryDescriptors: Query set of descriptors.
 
@@ -198,19 +191,19 @@ DescriptorMatcher::knnMatch
 
     :param k: Count of best matches found per each query descriptor or less if a query descriptor has less than k possible matches in total.
 
-    :param compactResult: Parameter that is used when the mask (or masks) is not empty. If  ``compactResult``  is false, the  ``matches``  vector has the same size as  ``queryDescriptors``  rows. If  ``compactResult``  is true, the  ``matches``  vector does not contain matches for fully masked-out query descriptors.
+    :param compactResult: Parameter used when the mask (or masks) is not empty. If  ``compactResult``  is false, the  ``matches``  vector has the same size as  ``queryDescriptors``  rows. If  ``compactResult``  is true, the  ``matches``  vector does not contain matches for fully masked-out query descriptors.
 
-These extended variants of :cpp:func:`DescriptorMatcher::match` methods find several best matches for each query descriptor. The matches are returned in the distance increasing order. See :cpp:func:`DescriptorMatcher::match` for the details about query and train descriptors. 
+These extended variants of :ocv:func:`DescriptorMatcher::match` methods find several best matches for each query descriptor. The matches are returned in the distance increasing order. See :ocv:func:`DescriptorMatcher::match` for the details about query and train descriptors. 
 
-.. index:: DescriptorMatcher::radiusMatch
+
 
 DescriptorMatcher::radiusMatch
 ----------------------------------
-.. cpp:function:: void DescriptorMatcher::radiusMatch( const Mat& queryDescriptors,           const Mat& trainDescriptors,           vector<vector<DMatch> >& matches,           float maxDistance, const Mat& mask=Mat(),           bool compactResult=false ) const
+For each query descriptor, finds the training descriptors not farther than the specified distance.
 
-.. cpp:function:: void DescriptorMatcher::radiusMatch( const Mat& queryDescriptors,           vector<vector<DMatch> >& matches,           float maxDistance,      const vector<Mat>& masks=vector<Mat>(),       bool compactResult=false )
+.. ocv:function:: void DescriptorMatcher::radiusMatch( const Mat& queryDescriptors,           const Mat& trainDescriptors,           vector<vector<DMatch> >& matches,           float maxDistance, const Mat& mask=Mat(),           bool compactResult=false ) const
 
-    For each query descriptor, finds the training descriptors not farther than the specified distance.
+.. ocv:function:: void DescriptorMatcher::radiusMatch( const Mat& queryDescriptors,           vector<vector<DMatch> >& matches,           float maxDistance,      const vector<Mat>& masks=vector<Mat>(),       bool compactResult=false )
 
     :param queryDescriptors: Query set of descriptors.
 
@@ -220,31 +213,31 @@ DescriptorMatcher::radiusMatch
 
     :param masks: Set of masks. Each  ``masks[i]``  specifies permissible matches between the input query descriptors and stored train descriptors from the i-th image ``trainDescCollection[i]``.
 
-    :param matches: The found matches.
+    :param matches: Found matches.
 
-    :param compactResult: Parameter that is used when the mask (or masks) is not empty. If  ``compactResult``  is false, the  ``matches``  vector has the same size as  ``queryDescriptors``  rows. If  ``compactResult``  is true, the  ``matches``  vector does not contain matches for fully masked-out query descriptors.
+    :param compactResult: Parameter used when the mask (or masks) is not empty. If  ``compactResult``  is false, the  ``matches``  vector has the same size as  ``queryDescriptors``  rows. If  ``compactResult``  is true, the  ``matches``  vector does not contain matches for fully masked-out query descriptors.
 
     :param maxDistance: Threshold for the distance between matched descriptors.
     
 For each query descriptor, the methods find such training descriptors that the distance between the query descriptor and the training descriptor is equal or smaller than ``maxDistance``. Found matches are returned in the distance increasing order.
 
-.. index:: DescriptorMatcher::clone
+
 
 DescriptorMatcher::clone
 ----------------------------
-.. cpp:function:: Ptr<DescriptorMatcher> DescriptorMatcher::clone( bool emptyTrainData ) const
+Clones the matcher.
 
-    Clones the matcher.
+.. ocv:function:: Ptr<DescriptorMatcher> DescriptorMatcher::clone( bool emptyTrainData ) const
 
     :param emptyTrainData: If ``emptyTrainData`` is false, the method creates a deep copy of the object, that is, copies both parameters and train data. If ``emptyTrainData`` is true, the method creates an object copy with the current parameters but with empty train data.
 
-.. index:: DescriptorMatcher::create
+
 
 DescriptorMatcher::create
 -----------------------------
-.. cpp:function:: Ptr<DescriptorMatcher> DescriptorMatcher::create( const string& descriptorMatcherType )
+Creates a descriptor matcher of a given type with the default parameters (using default constructor).
 
-    Creates a descriptor matcher of a given type with the default parameters (using default constructor).
+.. ocv:function:: Ptr<DescriptorMatcher> DescriptorMatcher::create( const string& descriptorMatcherType )
 
     :param descriptorMatcherType: Descriptor matcher type. Now the following matcher types are supported:
 
@@ -255,105 +248,37 @@ DescriptorMatcher::create
         * 
             ``BruteForce-Hamming``
         * 
-            ``BruteForce-HammingLUT``
+            ``BruteForce-Hamming(2)``
         * 
             ``FlannBased``
 
-.. index:: BruteForceMatcher
 
-.. _BruteForceMatcher:
 
-BruteForceMatcher
+
+
+BFMatcher
 -----------------
-.. c:type:: BruteForceMatcher
+.. ocv:class::BFMatcher
 
 Brute-force descriptor matcher. For each descriptor in the first set, this matcher finds the closest descriptor in the second set by trying each one. This descriptor matcher supports masking permissible matches of descriptor sets. ::
 
-    template<class Distance>
-    class BruteForceMatcher : public DescriptorMatcher
-    {
-    public:
-        BruteForceMatcher( Distance d = Distance() );
-        virtual ~BruteForceMatcher();
 
-        virtual bool isMaskSupported() const;
-        virtual Ptr<DescriptorMatcher> clone( bool emptyTrainData=false ) const;
-    protected:
-        ...
-    }
+BFMatcher::BFMatcher
+--------------------
+Brute-force matcher constructor.
 
+.. ocv:function:: BFMatcher::BFMatcher( int distanceType, bool crossCheck=false )
 
-For efficiency, ``BruteForceMatcher`` is used as a template parameterized with the distance type. For float descriptors, ``L2<float>`` is a common choice. The following distances are supported: ::
+    :param distanceType: One of ``NORM_L1``, ``NORM_L2``, ``NORM_HAMMING``, ``NORM_HAMMING2``. ``L1`` and ``L2`` norms are preferable choices for SIFT and SURF descriptors, ``NORM_HAMMING`` should be used with ORB and BRIEF, ``NORM_HAMMING2`` should be used with ORB when ``WTA_K==3`` or ``4`` (see ORB::ORB constructor description).
+    
+    :param crossCheck: If it is false, this is will be default BFMatcher behaviour when it finds the k nearest neighbors for each query descriptor. If ``crossCheck==true``, then the ``knnMatch()`` method with ``k=1`` will only return pairs ``(i,j)`` such that for ``i-th`` query descriptor the ``j-th`` descriptor in the matcher's collection is the nearest and vice versa, i.e. the ``BFMathcher`` will only return consistent pairs. Such technique usually produces best results with minimal number of outliers when there are enough matches. This is alternative to the ratio test, used by D. Lowe in SIFT paper.
 
-    template<typename T>
-    struct Accumulator
-    {
-        typedef T Type;
-    };
-
-    template<> struct Accumulator<unsigned char>  { typedef unsigned int Type; };
-    template<> struct Accumulator<unsigned short> { typedef unsigned int Type; };
-    template<> struct Accumulator<char>   { typedef int Type; };
-    template<> struct Accumulator<short>  { typedef int Type; };
-
-    /*
-     * Squared Euclidean distance functor
-     */
-    template<class T>
-    struct L2
-    {
-        typedef T ValueType;
-        typedef typename Accumulator<T>::Type ResultType;
-
-        ResultType operator()( const T* a, const T* b, int size ) const;
-    };
-
-    /*
-     * Manhattan distance (city block distance) functor
-     */
-    template<class T>
-    struct CV_EXPORTS L1
-    {
-        typedef T ValueType;
-        typedef typename Accumulator<T>::Type ResultType;
-
-        ResultType operator()( const T* a, const T* b, int size ) const;
-        ...
-    };
-
-    /*
-     * Hamming distance functor
-     */
-    struct HammingLUT
-    {
-        typedef unsigned char ValueType;
-        typedef int ResultType;
-
-        ResultType operator()( const unsigned char* a, const unsigned char* b,
-                               int size ) const;
-        ...
-    };
-
-    struct Hamming
-    {
-        typedef unsigned char ValueType;
-        typedef int ResultType;
-
-        ResultType operator()( const unsigned char* a, const unsigned char* b,
-                               int size ) const;
-        ...
-    };
-
-
-.. index:: FlannBasedMatcher
-
-.. _FlannBasedMatcher:
 
 FlannBasedMatcher
 -----------------
-.. c:type:: FlannBasedMatcher
+.. ocv:class:: FlannBasedMatcher
 
-Flann-based descriptor matcher. This matcher trains :ref:`flann::Index` on a train descriptor collection and calls its nearest search methods to find the best matches. So, this matcher may be faster when matching a large train collection than the brute force matcher. ``FlannBasedMatcher`` does not support masking permissible matches of descriptor sets because :cpp:func:`flann::Index` does not support this. ::
+Flann-based descriptor matcher. This matcher trains :ocv:class:`flann::Index_` on a train descriptor collection and calls its nearest search methods to find the best matches. So, this matcher may be faster when matching a large train collection than the brute force matcher. ``FlannBasedMatcher`` does not support masking permissible matches of descriptor sets because ``flann::Index`` does not support this. ::
 
     class FlannBasedMatcher : public DescriptorMatcher
     {

@@ -59,6 +59,7 @@ copyMask_(const uchar* _src, size_t sstep, const uchar* mask, size_t mstep, ucha
         const T* src = (const T*)_src;
         T* dst = (T*)_dst;
         int x = 0;
+		 #if CV_ENABLE_UNROLLED
         for( ; x <= size.width - 4; x += 4 )
         {
             if( mask[x] )
@@ -70,6 +71,7 @@ copyMask_(const uchar* _src, size_t sstep, const uchar* mask, size_t mstep, ucha
             if( mask[x+3] )
                 dst[x+3] = src[x+3];
         }
+        #endif
         for( ; x < size.width; x++ )
             if( mask[x] )
                 dst[x] = src[x];
@@ -171,11 +173,12 @@ void Mat::copyTo( OutputArray _dst ) const
             
             // to handle the copying 1xn matrix => nx1 std vector.
             Size sz = size() == dst.size() ?
-                getContinuousSize(*this, dst, (int)elemSize()) :
-                getContinuousSize(*this, (int)elemSize());
+                getContinuousSize(*this, dst) :
+                getContinuousSize(*this);
+            size_t len = sz.width*elemSize();
             
             for( ; sz.height--; sptr += step, dptr += dst.step )
-                memcpy( dptr, sptr, sz.width );
+                memcpy( dptr, sptr, len );
         }
         return;
     }
@@ -206,9 +209,11 @@ void Mat::copyTo( OutputArray _dst, InputArray _mask ) const
         return;
     }
     
-    CV_Assert( mask.type() == CV_8U );
+    int cn = channels(), mcn = mask.channels();
+    CV_Assert( mask.depth() == CV_8U && (mcn == 1 || mcn == cn) );
+    bool colorMask = mcn > 1;
     
-    size_t esz = elemSize();
+    size_t esz = colorMask ? elemSize1() : elemSize();
     BinaryFunc copymask = getCopyMaskFunc(esz);
     
     uchar* data0 = _dst.getMat().data;
@@ -220,7 +225,7 @@ void Mat::copyTo( OutputArray _dst, InputArray _mask ) const
     
     if( dims <= 2 )
     {
-        Size sz = getContinuousSize(*this, dst, mask);
+        Size sz = getContinuousSize(*this, dst, mask, mcn);
         copymask(data, step, mask.data, mask.step, dst.data, dst.step, sz, &esz);
         return;
     }
@@ -228,7 +233,7 @@ void Mat::copyTo( OutputArray _dst, InputArray _mask ) const
     const Mat* arrays[] = { this, &dst, &mask, 0 };
     uchar* ptrs[3];
     NAryMatIterator it(arrays, ptrs);
-    Size sz((int)it.size, 1);
+    Size sz((int)(it.size*mcn), 1);
     
     for( size_t i = 0; i < it.nplanes; i++, ++it )
         copymask(ptrs[0], 0, ptrs[2], 0, ptrs[1], 0, sz, &esz);
@@ -256,7 +261,7 @@ Mat& Mat::operator = (const Scalar& s)
             
             for( size_t j = 0; j < size; j += blockSize )
             {
-                size_t sz = std::min(blockSize, size - j);
+                size_t sz = MIN(blockSize, size - j);
                 memcpy( ptr + j, scalar, sz );
             }
         }
@@ -315,13 +320,13 @@ Mat& Mat::setTo(InputArray _value, InputArray _mask)
 static void
 flipHoriz( const uchar* src, size_t sstep, uchar* dst, size_t dstep, Size size, size_t esz )
 {
-    int i, j, limit = ((size.width + 1)/2)*esz;
+    int i, j, limit = (int)(((size.width + 1)/2)*esz);
     AutoBuffer<int> _tab(size.width*esz);
     int* tab = _tab;
     
     for( i = 0; i < size.width; i++ )
         for( size_t k = 0; k < esz; k++ )
-            tab[i*esz + k] = (size.width - i - 1)*esz + k;
+            tab[i*esz + k] = (int)((size.width - i - 1)*esz + k);
 
     for( ; size.height--; src += sstep, dst += dstep )
     {

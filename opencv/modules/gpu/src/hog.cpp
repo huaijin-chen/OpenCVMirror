@@ -60,40 +60,43 @@ std::vector<float> cv::gpu::HOGDescriptor::getPeopleDetector64x128() { throw_nog
 
 #else
 
-namespace cv { namespace gpu { namespace hog {
+namespace cv { namespace gpu { namespace device 
+{
+    namespace hog 
+    {
+        void set_up_constants(int nbins, int block_stride_x, int block_stride_y, 
+                              int nblocks_win_x, int nblocks_win_y);
 
-void set_up_constants(int nbins, int block_stride_x, int block_stride_y, 
-                      int nblocks_win_x, int nblocks_win_y);
+        void compute_hists(int nbins, int block_stride_x, int blovck_stride_y,
+                           int height, int width, const cv::gpu::DevMem2Df& grad, 
+                           const cv::gpu::DevMem2Db& qangle, float sigma, float* block_hists);
 
-void compute_hists(int nbins, int block_stride_x, int blovck_stride_y,
-                   int height, int width, const cv::gpu::DevMem2Df& grad, 
-                   const cv::gpu::DevMem2D& qangle, float sigma, float* block_hists);
+        void normalize_hists(int nbins, int block_stride_x, int block_stride_y, 
+                             int height, int width, float* block_hists, float threshold);
 
-void normalize_hists(int nbins, int block_stride_x, int block_stride_y, 
-                     int height, int width, float* block_hists, float threshold);
+        void classify_hists(int win_height, int win_width, int block_stride_y, 
+                            int block_stride_x, int win_stride_y, int win_stride_x, int height, 
+                            int width, float* block_hists, float* coefs, float free_coef, 
+                            float threshold, unsigned char* labels);
 
-void classify_hists(int win_height, int win_width, int block_stride_y, 
-                    int block_stride_x, int win_stride_y, int win_stride_x, int height, 
-                    int width, float* block_hists, float* coefs, float free_coef, 
-                    float threshold, unsigned char* labels);
+        void extract_descrs_by_rows(int win_height, int win_width, int block_stride_y, int block_stride_x, 
+                                    int win_stride_y, int win_stride_x, int height, int width, float* block_hists, 
+                                    cv::gpu::DevMem2Df descriptors);
+        void extract_descrs_by_cols(int win_height, int win_width, int block_stride_y, int block_stride_x, 
+                                    int win_stride_y, int win_stride_x, int height, int width, float* block_hists, 
+                                    cv::gpu::DevMem2Df descriptors);
 
-void extract_descrs_by_rows(int win_height, int win_width, int block_stride_y, int block_stride_x, 
-                            int win_stride_y, int win_stride_x, int height, int width, float* block_hists, 
-                            cv::gpu::DevMem2Df descriptors);
-void extract_descrs_by_cols(int win_height, int win_width, int block_stride_y, int block_stride_x, 
-                            int win_stride_y, int win_stride_x, int height, int width, float* block_hists, 
-                            cv::gpu::DevMem2Df descriptors);
+        void compute_gradients_8UC1(int nbins, int height, int width, const cv::gpu::DevMem2Db& img, 
+                                    float angle_scale, cv::gpu::DevMem2Df grad, cv::gpu::DevMem2Db qangle, bool correct_gamma);
+        void compute_gradients_8UC4(int nbins, int height, int width, const cv::gpu::DevMem2Db& img, 
+                                    float angle_scale, cv::gpu::DevMem2Df grad, cv::gpu::DevMem2Db qangle, bool correct_gamma);
 
-void compute_gradients_8UC1(int nbins, int height, int width, const cv::gpu::DevMem2D& img, 
-                            float angle_scale, cv::gpu::DevMem2Df grad, cv::gpu::DevMem2D qangle, bool correct_gamma);
-void compute_gradients_8UC4(int nbins, int height, int width, const cv::gpu::DevMem2D& img, 
-                            float angle_scale, cv::gpu::DevMem2Df grad, cv::gpu::DevMem2D qangle, bool correct_gamma);
-
-void resize_8UC1(const cv::gpu::DevMem2D& src, cv::gpu::DevMem2D dst);
-void resize_8UC4(const cv::gpu::DevMem2D& src, cv::gpu::DevMem2D dst);
-
+        void resize_8UC1(const cv::gpu::DevMem2Db& src, cv::gpu::DevMem2Db dst);
+        void resize_8UC4(const cv::gpu::DevMem2Db& src, cv::gpu::DevMem2Db dst);
+    }
 }}}
 
+using namespace ::cv::gpu::device;
     
 cv::gpu::HOGDescriptor::HOGDescriptor(Size win_size, Size block_size, Size block_stride, Size cell_size, 
 									  int nbins, double win_sigma, double threshold_L2hys, bool gamma_correction, int nlevels)
@@ -175,7 +178,7 @@ cv::gpu::GpuMat cv::gpu::HOGDescriptor::getBuffer(const Size& sz, int type, GpuM
 	if (buf.empty() || buf.type() != type)
 		buf.create(sz, type);
 	else
-		if (buf.cols < sz.width || buf.rows < sz.width)
+		if (buf.cols < sz.width || buf.rows < sz.height)
 			buf.create(std::max(buf.rows, sz.height), std::max(buf.cols, sz.width), type);	
 
 	return buf(Rect(Point(0,0), sz));
@@ -218,7 +221,7 @@ void cv::gpu::HOGDescriptor::computeBlockHistograms(const GpuMat& img)
     Size blocks_per_img = numPartsWithin(img.size(), block_size, block_stride);
 
 	//   block_hists.create(1, block_hist_size * blocks_per_img.area(), CV_32F);
-	block_hists = getBuffer(1, block_hist_size * blocks_per_img.area(), CV_32F, block_hists_buf);
+	block_hists = getBuffer(1, static_cast<int>(block_hist_size * blocks_per_img.area()), CV_32F, block_hists_buf);
     
     hog::compute_hists(nbins, block_stride.width, block_stride.height, img.rows, img.cols, 
 						grad, qangle, (float)getWinSigma(), block_hists.ptr<float>());
@@ -234,11 +237,11 @@ void cv::gpu::HOGDescriptor::getDescriptors(const GpuMat& img, Size win_stride, 
 
     computeBlockHistograms(img);
 
-    const int block_hist_size = getBlockHistogramSize();
+    const size_t block_hist_size = getBlockHistogramSize();
     Size blocks_per_win = numPartsWithin(win_size, block_size, block_stride);
     Size wins_per_img   = numPartsWithin(img.size(), win_size, win_stride);
 
-    descriptors.create(wins_per_img.area(), blocks_per_win.area() * block_hist_size, CV_32F);
+    descriptors.create(wins_per_img.area(), static_cast<int>(blocks_per_win.area() * block_hist_size), CV_32F);
 
     switch (descr_format)
     {

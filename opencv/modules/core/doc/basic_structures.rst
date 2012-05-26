@@ -5,10 +5,10 @@ Basic Structures
 
 DataType
 --------
-.. cpp:class:: DataType
+.. ocv:class:: DataType
 
 Template "trait" class for OpenCV primitive data types. A primitive OpenCV data type is one of ``unsigned char``, ``bool``, ``signed char``, ``unsigned short``, ``signed short``, ``int``, ``float``, ``double``, or a tuple of values of one of these types, where all the values in the tuple have the same type. Any primitive type from the list can be defined by an identifier in the form ``CV_<bit-depth>{U|S|F}C(<number_of_channels>)``, for example: ``uchar`` ~ ``CV_8UC1``, 3-element floating-point tuple ~ ``CV_32FC3``, and so on. A universal OpenCV structure that is able to store a single instance of such a primitive data type is
-:cpp:class:`Vec`. Multiple instances of such a type can be stored in a ``std::vector``, ``Mat``, ``Mat_``, ``SparseMat``, ``SparseMat_``, or any other container that is able to store ``Vec`` instances.
+:ocv:class:`Vec`. Multiple instances of such a type can be stored in a ``std::vector``, ``Mat``, ``Mat_``, ``SparseMat``, ``SparseMat_``, or any other container that is able to store ``Vec`` instances.
 
 The ``DataType`` class is basically used to provide a description of such primitive data types without adding any fields or methods to the corresponding classes (and it is actually impossible to add anything to primitive C/C++ data types). This technique is known in C++ as class traits. It is not ``DataType`` itself that is used but its specialized versions, such as: ::
 
@@ -42,12 +42,12 @@ The main purpose of this class is to convert compilation-time type information t
     cout << B.depth() << ", " << B.channels() << endl;
 
 
-So, such traits are used to tell OpenCV which data type you are working with, even if such a type is not native to OpenCV. For example, the matrix ``B`` intialization above is compiled because OpenCV defines the proper specialized template class ``DataType<complex<_Tp> >`` . This mechanism is also useful (and used in OpenCV this way) for generic algorithms implementations.
+So, such traits are used to tell OpenCV which data type you are working with, even if such a type is not native to OpenCV. For example, the matrix ``B`` initialization above is compiled because OpenCV defines the proper specialized template class ``DataType<complex<_Tp> >`` . This mechanism is also useful (and used in OpenCV this way) for generic algorithms implementations.
 
 
 Point\_
 -------
-.. cpp:class:: Point_
+.. ocv:class:: Point_
 
 Template class for 2D points specified by its coordinates
 :math:`x` and
@@ -82,7 +82,7 @@ Example: ::
 
 Point3\_
 --------
-.. cpp:class:: Point3_
+.. ocv:class:: Point3_
 
 Template class for 3D points specified by its coordinates
 :math:`x`,
@@ -98,9 +98,9 @@ The following ``Point3_<>`` aliases are available: ::
 
 Size\_
 ------
-.. cpp:class:: Size_
+.. ocv:class:: Size_
 
-Template class for specfying the size of an image or rectangle. The class includes two members called ``width`` and ``height``. The structure can be converted to and from the old OpenCV structures
+Template class for specifying the size of an image or rectangle. The class includes two members called ``width`` and ``height``. The structure can be converted to and from the old OpenCV structures
 ``CvSize`` and ``CvSize2D32f`` . The same set of arithmetic and comparison operations as for ``Point_`` is available.
 
 OpenCV defines the following ``Size_<>`` aliases: ::
@@ -111,9 +111,9 @@ OpenCV defines the following ``Size_<>`` aliases: ::
 
 Rect\_
 ------
-.. cpp:class:: Rect_
+.. ocv:class:: Rect_
 
-Template class for 2D rectangles, described by the following parameters::
+Template class for 2D rectangles, described by the following parameters:
 
 * Coordinates of the top-left corner. This is a default interpretation of ``Rect_::x`` and ``Rect_::y`` in OpenCV. Though, in your algorithms you may count ``x`` and ``y`` from the bottom-left corner. 
 * Rectangle width and height.
@@ -169,20 +169,61 @@ For your convenience, the ``Rect_<>`` alias is available: ::
 
 RotatedRect
 -----------
-.. cpp:class:: RotatedRect
+.. ocv:class:: RotatedRect
 
-Template class for rotated rectangles specified by the center, size, and the rotation angle in degrees.
+The class represents rotated (i.e. not up-right) rectangles on a plane. Each rectangle is specified by the center point (mass center), length of each side (represented by cv::Size2f structure) and the rotation angle in degrees.
 
+    .. ocv:function:: RotatedRect::RotatedRect()
+    .. ocv:function:: RotatedRect::RotatedRect(const Point2f& center, const Size2f& size, float angle)
+    .. ocv:function:: RotatedRect::RotatedRect(const CvBox2D& box)
+
+        :param center: The rectangle mass center.
+        :param size: Width and height of the rectangle.
+        :param angle: The rotation angle in a clockwise direction. When the angle is 0, 90, 180, 270 etc., the rectangle becomes an up-right rectangle.
+        :param box: The rotated rectangle parameters as the obsolete CvBox2D structure.
+
+    .. ocv:function:: void RotatedRect::points(Point2f* pts) const
+    .. ocv:function:: Rect RotatedRect::boundingRect() const
+    .. ocv:function:: RotatedRect::operator CvBox2D() const
+
+        :param pts: The points array for storing rectangle vertices.
+
+The sample below demonstrates how to use RotatedRect:
+
+::
+
+    Mat image(200, 200, CV_8UC3, Scalar(0));
+    RotatedRect rRect = RotatedRect(Point2f(100,100), Size2f(100,50), 30);
+
+    Point2f vertices[4];
+    rRect.points(vertices);
+    for (int i = 0; i < 4; i++)
+        line(image, vertices[i], vertices[(i+1)%4], Scalar(0,255,0));
+
+    Rect brect = rRect.boundingRect();
+    rectangle(image, brect, Scalar(255,0,0));
+
+    imshow("rectangles", image);
+    waitKey(0);
+
+.. image:: pics/rotatedrect.png
+
+.. seealso::
+
+    :ocv:cfunc:`CamShift`,
+    :ocv:func:`fitEllipse`,
+    :ocv:func:`minAreaRect`,
+    :ocv:struct:`CvBox2D`
 
 TermCriteria
 ------------
-.. cpp:class:: TermCriteria
+.. ocv:class:: TermCriteria
 
 Template class defining termination criteria for iterative algorithms.
 
 Matx
 ----
-.. cpp:class:: Matx
+.. ocv:class:: Matx
 
 Template class for small matrices whose type and size are known at compilation time: ::
 
@@ -206,7 +247,7 @@ Template class for small matrices whose type and size are known at compilation t
     typedef Matx<float, 6, 6> Matx66f;
     typedef Matx<double, 6, 6> Matx66d;
     
-If you need a more flexible type, use :cpp:class:`Mat` . The elements of the matrix ``M`` are accessible using the ``M(i,j)`` notation. Most of the common matrix operations (see also
+If you need a more flexible type, use :ocv:class:`Mat` . The elements of the matrix ``M`` are accessible using the ``M(i,j)`` notation. Most of the common matrix operations (see also
 :ref:`MatrixExpressions` ) are available. To do an operation on ``Matx`` that is not implemented, you can easily convert the matrix to
 ``Mat`` and backwards. ::
 
@@ -215,12 +256,12 @@ If you need a more flexible type, use :cpp:class:`Mat` . The elements of the mat
               7, 8, 9);
     cout << sum(Mat(m*m.t())) << endl;
 
-	
+    
 Vec
 ---
-.. cpp:class:: Vec
+.. ocv:class:: Vec
 
-Template class for short numerical vectors, a partial case of :cpp:class:`Matx`: ::
+Template class for short numerical vectors, a partial case of :ocv:class:`Matx`: ::
 
     template<typename _Tp, int n> class Vec : public Matx<_Tp, n, 1> {...};
     
@@ -246,7 +287,7 @@ Template class for short numerical vectors, a partial case of :cpp:class:`Matx`:
     typedef Vec<double, 4> Vec4d;
     typedef Vec<double, 6> Vec6d;
     
-It is possible to convert ``Vec<T,2>`` to/from ``Point_``, ``Vec<T,3>`` to/from ``Point3_`` , and ``Vec<T,4>`` to ``CvScalar`` or :cpp:class:`Scalar`. Use ``operator[]`` to access the elements of ``Vec``. 
+It is possible to convert ``Vec<T,2>`` to/from ``Point_``, ``Vec<T,3>`` to/from ``Point3_`` , and ``Vec<T,4>`` to :ocv:struct:`CvScalar` or :ocv:class:`Scalar_`. Use ``operator[]`` to access the elements of ``Vec``. 
 
 All the expected vector operations are also implemented:
 
@@ -259,11 +300,11 @@ All the expected vector operations are also implemented:
 * ``v1 == v2, v1 != v2``
 * ``norm(v1)``  (euclidean norm)
 
-The ``Vec`` class is commonly used to describe pixel types of multi-channel arrays. See :cpp:class:`Mat` for details.
+The ``Vec`` class is commonly used to describe pixel types of multi-channel arrays. See :ocv:class:`Mat` for details.
 
 Scalar\_
 --------
-.. cpp:class:: Scalar_
+.. ocv:class:: Scalar_
 
 Template class for a 4-element vector derived from Vec. ::
 
@@ -275,7 +316,7 @@ Being derived from ``Vec<_Tp, 4>`` , ``Scalar_`` and ``Scalar`` can be used just
 
 Range
 -----
-.. cpp:class:: Range
+.. ocv:class:: Range
 
 Template class specifying a continuous subsequence (slice) of a sequence. ::
 
@@ -287,7 +328,7 @@ Template class specifying a continuous subsequence (slice) of a sequence. ::
     };
 
 The class is used to specify a row or a column span in a matrix (
-:cpp:class:`Mat` ) and for many other purposes. ``Range(a,b)`` is basically the same as ``a:b`` in Matlab or ``a..b`` in Python. As in Python, ``start`` is an inclusive left boundary of the range and ``end`` is an exclusive right boundary of the range. Such a half-opened interval is usually denoted as
+:ocv:class:`Mat` ) and for many other purposes. ``Range(a,b)`` is basically the same as ``a:b`` in Matlab or ``a..b`` in Python. As in Python, ``start`` is an inclusive left boundary of the range and ``end`` is an exclusive right boundary of the range. Such a half-opened interval is usually denoted as
 :math:`[start,end)` .
 
 The static method ``Range::all()`` returns a special variable that means "the whole sequence" or "the whole range", just like " ``:`` " in Matlab or " ``...`` " in Python. All the methods and functions in OpenCV that take ``Range`` support this special ``Range::all()`` value. But, of course, in case of your own custom processing, you will probably have to check and handle it explicitly: ::
@@ -303,9 +344,11 @@ The static method ``Range::all()`` returns a special variable that means "the wh
     }
 
 
+.. _Ptr: 
+
 Ptr
 ---
-.. cpp:class:: Ptr
+.. ocv:class:: Ptr
 
 Template class for smart reference-counting pointers ::
 
@@ -370,7 +413,7 @@ This class provides the following options:
 *
     Heterogeneous collections of objects. The standard STL and most other C++ and OpenCV containers can store only objects of the same type and the same size. The classical solution to store objects of different types in the same container is to store pointers to the base class ``base_class_t*``     instead but then you loose the automatic memory management. Again, by using ``Ptr<base_class_t>()``     instead of the raw pointers, you can solve the problem.
 
-The ``Ptr`` class treats the wrapped object as a black box. The reference counter is allocated and managed separately. The only thing the pointer class needs to know about the object is how to deallocate it. This knowledge is incapsulated in the ``Ptr::delete_obj()`` method that is called when the reference counter becomes 0. If the object is a C++ class instance, no additional coding is needed, because the default implementation of this method calls ``delete obj;`` .
+The ``Ptr`` class treats the wrapped object as a black box. The reference counter is allocated and managed separately. The only thing the pointer class needs to know about the object is how to deallocate it. This knowledge is encapsulated in the ``Ptr::delete_obj()`` method that is called when the reference counter becomes 0. If the object is a C++ class instance, no additional coding is needed, because the default implementation of this method calls ``delete obj;`` .
 However, if the object is deallocated in a different way, the specialized method should be created. For example, if you want to wrap ``FILE`` , the ``delete_obj`` may be implemented as follows: ::
 
     template<> inline void Ptr<FILE>::delete_obj()
@@ -389,11 +432,11 @@ However, if the object is deallocated in a different way, the specialized method
     // the file will be closed automatically by the Ptr<FILE> destructor.
 
 
-.. note:: The reference increment/decrement operations are implemented as atomic operations, and therefore it is normally safe to use the classes in multi-threaded applications. The same is true for :cpp:class:`Mat` and other C++ OpenCV classes that operate on the reference counters.
+.. note:: The reference increment/decrement operations are implemented as atomic operations, and therefore it is normally safe to use the classes in multi-threaded applications. The same is true for :ocv:class:`Mat` and other C++ OpenCV classes that operate on the reference counters.
 
 Mat
 ---
-.. cpp:class:: Mat
+.. ocv:class:: Mat
 
 OpenCV C++ n-dimensional dense array class ::
 
@@ -588,7 +631,7 @@ There are many different ways to create a ``Mat`` object. The most popular optio
 
     ..
 
-    With this approach, you first call a constructor of the :cpp:class:`Mat_`  class with the proper parameters, and then you just put ``<<``     operator followed by comma-separated values that can be constants, variables, expressions, and so on. Also, note the extra parentheses required to avoid compilation errors.
+    With this approach, you first call a constructor of the :ocv:class:`Mat_`  class with the proper parameters, and then you just put ``<<``     operator followed by comma-separated values that can be constants, variables, expressions, and so on. Also, note the extra parentheses required to avoid compilation errors.
 
 Once the array is created, it is automatically managed via a reference-counting mechanism. If the array header is built on top of user-allocated data, you should handle the data by yourself.
 The array data is deallocated when no one points to it. If you want to release the data pointed by a array header before the array destructor is called, use ``Mat::release()`` .
@@ -645,107 +688,146 @@ Finally, there are STL-style iterators that are smart enough to skip gaps betwee
 
 The matrix iterators are random-access iterators, so they can be passed to any STL algorithm, including ``std::sort()`` .
 
+
 .. _MatrixExpressions:
 
 Matrix Expressions
 ------------------
 
 This is a list of implemented matrix operations that can be combined in arbitrary complex expressions
-(here
-*A*,*B*
-stand for matrices ( ``Mat`` ),
-*s*
-for a scalar ( ``Scalar`` ),
-:math:`\alpha` for a real-valued scalar ( ``double`` )):
+(here ``A``, ``B`` stand for matrices ( ``Mat`` ), ``s`` for a scalar ( ``Scalar`` ),
+``alpha`` for a real-valued scalar ( ``double`` )):
 
 *
     Addition, subtraction, negation:
-    :math:`A \pm B,\;A \pm s,\;s \pm A,\;-A` *
-    scaling:
-    :math:`A*\alpha`,    :math:`A*\alpha` *
-    per-element multiplication and division:
-    :math:`A.mul(B), A/B, \alpha/A` *
-    matrix multiplication:
-    :math:`A*B` *
-    transposition:
-    :math:`A.t() \sim A^t` *
-    matrix inversion and pseudo-inversion, solving linear systems and least-squares problems:
+    ``A+B, A-B, A+s, A-s, s+A, s-A, -A``
+    
+*   
+    Scaling:
+    ``A*alpha``
+    
+*
+    Per-element multiplication and division:
+    ``A.mul(B), A/B, alpha/A``
+    
+*
+    Matrix multiplication:
+    ``A*B``
+    
+*
+    Transposition:
+    ``A.t()`` (means ``A``\ :sup:`T`)
+    
+*
+    Matrix inversion and pseudo-inversion, solving linear systems and least-squares problems:
 
-    :math:`A.inv([method]) \sim A^{-1}, A.inv([method])*B \sim X:\,AX=B`
+    ``A.inv([method])`` (~ ``A``\ :sup:`-1`) ``,   A.inv([method])*B`` (~ ``X: AX=B``)
     
 *
     Comparison:
-    :math:`A\gtreqqless B,\;A \ne B,\;A \gtreqqless \alpha,\;A \ne \alpha`. The result of comparison is an 8-bit single channel mask whose elements are set to 255 (if the particular element or pair of elements satisfy the condition) or 0.
+    ``A cmpop B, A cmpop alpha, alpha cmpop A``, where ``cmpop`` is one of ``:  >, >=, ==, !=, <=, <``. The result of comparison is an 8-bit single channel mask whose elements are set to 255 (if the particular element or pair of elements satisfy the condition) or 0.
 
 *
-    Bitwise logical operations: ``A & B, A & s, A | B, A | s, A textasciicircum B, A textasciicircum s, ~ A`` *
-    element-wise minimum and maximum:
-    :math:`min(A, B), min(A, \alpha), max(A, B), max(A, \alpha)` *
-    element-wise absolute value:
-    :math:`abs(A)` *
-    cross-product, dot-product:
-    :math:`A.cross(B), A.dot(B)` *
-    any function of matrix or matrices and scalars that returns a matrix or a scalar, such as ``norm``, ``mean``, ``sum``, ``countNonZero``, ``trace``, ``determinant``, ``repeat``, and others.
+    Bitwise logical operations: ``A logicop B, A logicop s, s logicop A, ~A``, where ``logicop`` is one of ``:  &, |, ^``.
+    
+*
+    Element-wise minimum and maximum:
+    ``min(A, B), min(A, alpha), max(A, B), max(A, alpha)``
+    
+*
+    Element-wise absolute value:
+    ``abs(A)``
+    
+*
+    Cross-product, dot-product:
+    ``A.cross(B)``
+    ``A.dot(B)``
+    
+*
+    Any function of matrix or matrices and scalars that returns a matrix or a scalar, such as ``norm``, ``mean``, ``sum``, ``countNonZero``, ``trace``, ``determinant``, ``repeat``, and others.
 
 *
-    Matrix initializers ( ``eye(), zeros(), ones()``     ), matrix comma-separated initializers, matrix constructors and operators that extract sub-matrices (see :cpp:class:`Mat`     description).
+    Matrix initializers ( ``Mat::eye(), Mat::zeros(), Mat::ones()`` ), matrix comma-separated initializers, matrix constructors and operators that extract sub-matrices (see :ocv:class:`Mat` description).
 
 *
     ``Mat_<destination_type>()`` constructors to cast the result to the proper type.
 
-.. note:: Comma-separated initializers and probably some other operations may require additional explicit ``Mat()`` or ``Mat_<T>()`` constuctor calls to resolve a possible ambiguity.
+.. note:: Comma-separated initializers and probably some other operations may require additional explicit ``Mat()`` or ``Mat_<T>()`` constructor calls to resolve a possible ambiguity.
+
+Here are examples of matrix expressions:
+
+::
+
+    // compute pseudo-inverse of A, equivalent to A.inv(DECOMP_SVD)
+    SVD svd(A);
+    Mat pinvA = svd.vt.t()*Mat::diag(1./svd.w)*svd.u.t();
+    
+    // compute the new vector of parameters in the Levenberg-Marquardt algorithm
+    x -= (A.t()*A + lambda*Mat::eye(A.cols,A.cols,A.type())).inv(DECOMP_CHOLESKY)*(A.t()*err);
+    
+    // sharpen image using "unsharp mask" algorithm
+    Mat blurred; double sigma = 1, threshold = 5, amount = 1;
+    GaussianBlur(img, blurred, Size(), sigma, sigma);
+    Mat lowConstrastMask = abs(img - blurred) < threshold;
+    Mat sharpened = img*(1+amount) + blurred*(-amount);
+    img.copyTo(sharpened, lowContrastMask);
+    
+..
+
 
 Below is the formal description of the ``Mat`` methods.
 
 Mat::Mat
 ------------
-.. cpp:function:: Mat::Mat()
-                  
-.. cpp:function:: Mat::Mat(int rows, int cols, int type)
-                  
-.. cpp:function:: Mat::Mat(Size size, int type)
-                  
-.. cpp:function:: Mat::Mat(int rows, int cols, int type, const Scalar& s)
-                  
-.. cpp:function:: Mat::Mat(Size size, int type, const Scalar& s)
-                  
-.. cpp:function:: Mat::Mat(const Mat& m)
-                  
-.. cpp:function:: Mat::Mat(int rows, int cols, int type, void* data, size_t step=AUTO_STEP)
-                  
-.. cpp:function:: Mat::Mat(Size size, int type, void* data, size_t step=AUTO_STEP)
-                  
-.. cpp:function:: Mat::Mat(const Mat& m, const Range& rowRange, const Range& colRange)
-                  
-.. cpp:function:: Mat::Mat(const Mat& m, const Rect& roi)
+Various Mat constructors
 
-.. cpp:function:: Mat::Mat(const CvMat* m, bool copyData=false)
+.. ocv:function:: Mat::Mat()
                   
-.. cpp:function:: Mat::Mat(const IplImage* img, bool copyData=false)
+.. ocv:function:: Mat::Mat(int rows, int cols, int type)
                   
-.. cpp:function:: template<typename T, int n> explicit Mat::Mat(const Vec<T, n>& vec, bool copyData=true)
+.. ocv:function:: Mat::Mat(Size size, int type)
+                  
+.. ocv:function:: Mat::Mat(int rows, int cols, int type, const Scalar& s)
+                  
+.. ocv:function:: Mat::Mat(Size size, int type, const Scalar& s)
+                  
+.. ocv:function:: Mat::Mat(const Mat& m)
+                  
+.. ocv:function:: Mat::Mat(int rows, int cols, int type, void* data, size_t step=AUTO_STEP)
+                  
+.. ocv:function:: Mat::Mat(Size size, int type, void* data, size_t step=AUTO_STEP)
+                  
+.. ocv:function:: Mat::Mat(const Mat& m, const Range& rowRange, const Range& colRange)
+                  
+.. ocv:function:: Mat::Mat(const Mat& m, const Rect& roi)
 
-.. cpp:function:: template<typename T, int m, int n> explicit Mat::Mat(const Matx<T, m, n>& vec, bool copyData=true)
+.. ocv:function:: Mat::Mat(const CvMat* m, bool copyData=false)
+                  
+.. ocv:function:: Mat::Mat(const IplImage* img, bool copyData=false)
+                  
+.. ocv:function:: template<typename T, int n> explicit Mat::Mat(const Vec<T, n>& vec, bool copyData=true)
 
-.. cpp:function:: template<typename T> explicit Mat::Mat(const vector<T>& vec, bool copyData=false)
-                  
-.. cpp:function:: Mat::Mat(const MatExpr& expr)
-                  
-.. cpp:function:: Mat::Mat(int ndims, const int* sizes, int type)
-                  
-.. cpp:function:: Mat::Mat(int ndims, const int* sizes, int type, const Scalar& s)
-                  
-.. cpp:function:: Mat::Mat(int ndims, const int* sizes, int type, void* data, const size_t* steps=0)
-                  
-.. cpp:function:: Mat::Mat(const Mat& m, const Range* ranges)
+.. ocv:function:: template<typename T, int m, int n> explicit Mat::Mat(const Matx<T, m, n>& vec, bool copyData=true)
 
-    Provides various array constructors.
+.. ocv:function:: template<typename T> explicit Mat::Mat(const vector<T>& vec, bool copyData=false)
+                  
+.. ocv:function:: Mat::Mat(const MatExpr& expr)
+                  
+.. ocv:function:: Mat::Mat(int ndims, const int* sizes, int type)
+                  
+.. ocv:function:: Mat::Mat(int ndims, const int* sizes, int type, const Scalar& s)
+                  
+.. ocv:function:: Mat::Mat(int ndims, const int* sizes, int type, void* data, const size_t* steps=0)
+                  
+.. ocv:function:: Mat::Mat(const Mat& m, const Range* ranges)
 
     :param ndims: Array dimensionality.
 
     :param rows: Number of rows in a 2D array.
 
     :param cols: Number of columns in a 2D array.
+
+    :param roi: Region of interest.
 
     :param size: 2D array size:  ``Size(cols, rows)`` . In the  ``Size()``  constructor, the number of rows and the number of columns go in the reverse order.
 
@@ -757,7 +839,7 @@ Mat::Mat
 
     :param data: Pointer to the user data. Matrix constructors that take  ``data``  and  ``step``  parameters do not allocate matrix data. Instead, they just initialize the matrix header that points to the specified data, which means that no data is copied. This operation is very efficient and can be used to process external data using OpenCV functions. The external data is not automatically deallocated, so you should take care of it.
 
-    :param step: Number of bytes each matrix row occupies. The value should include the padding bytes at the end of each row, if any. If the parameter is missing (set to  ``AUTO_STEP`` ), no padding is assumed and the actual step is calculated as  ``cols*elemSize()`` . See  :cpp:func:`Mat::elemSize` .
+    :param step: Number of bytes each matrix row occupies. The value should include the padding bytes at the end of each row, if any. If the parameter is missing (set to  ``AUTO_STEP`` ), no padding is assumed and the actual step is calculated as  ``cols*elemSize()`` . See  :ocv:func:`Mat::elemSize` .
 
     :param steps: Array of  ``ndims-1``  steps in case of a multi-dimensional array (the last step is always set to the element size). If not specified, the matrix is assumed to be continuous.
 
@@ -765,7 +847,7 @@ Mat::Mat
 
     :param img: Pointer to the old-style  ``IplImage``  image structure. By default, the data is shared between the original image and the new matrix. But when  ``copyData``  is set, the full copy of the image data is created.
 
-    :param vec: STL vector whose elements form the matrix. The matrix has a single column and the number of rows equal to the number of vector elements. Type of the matrix matches the type of vector elements. The constructor can handle arbitrary types, for which there is a properly declared  :cpp:class:`DataType` . This means that the vector elements must be primitive numbers or uni-type numerical tuples of numbers. Mixed-type structures are not supported. The corresponding constructor is explicit. Since STL vectors are not automatically converted to  ``Mat``  instances, you should write  ``Mat(vec)``  explicitly. Unless you copy the data into the matrix ( ``copyData=true`` ), no new elements will be added to the vector because it can potentially yield vector data reallocation, and, thus, the matrix data pointer will be invalid.
+    :param vec: STL vector whose elements form the matrix. The matrix has a single column and the number of rows equal to the number of vector elements. Type of the matrix matches the type of vector elements. The constructor can handle arbitrary types, for which there is a properly declared  :ocv:class:`DataType` . This means that the vector elements must be primitive numbers or uni-type numerical tuples of numbers. Mixed-type structures are not supported. The corresponding constructor is explicit. Since STL vectors are not automatically converted to  ``Mat``  instances, you should write  ``Mat(vec)``  explicitly. Unless you copy the data into the matrix ( ``copyData=true`` ), no new elements will be added to the vector because it can potentially yield vector data reallocation, and, thus, the matrix data pointer will be invalid.
 
     :param copyData: Flag to specify whether the underlying data of the STL vector or the old-style  ``CvMat``  or  ``IplImage``  should be copied to (``true``) or shared with (``false``) the newly constructed matrix. When the data is copied, the allocated buffer is managed using  ``Mat`` reference counting mechanism. While the data is shared, the reference counter is NULL, and you should not deallocate the data until the matrix is not destructed.
 
@@ -779,30 +861,29 @@ Mat::Mat
 
 These are various constructors that form a matrix. As noted in the :ref:`AutomaticAllocation`,
 often the default constructor is enough, and the proper matrix will be allocated by an OpenCV function. The constructed matrix can further be assigned to another matrix or matrix expression or can be allocated with
-:cpp:func:`Mat::create` . In the former case, the old content is de-referenced.
+:ocv:func:`Mat::create` . In the former case, the old content is de-referenced.
 
 
 Mat::~Mat
 ------------
-.. cpp:function:: Mat::~Mat()
+The Mat destructor.
 
-    Provides a matrix destructor.
+.. ocv:function:: Mat::~Mat()
 
-The matrix destructor calls
-:cpp:func:`Mat::release` .
+The matrix destructor calls :ocv:func:`Mat::release` .
 
 
 Mat::operator =
 -------------------
-.. cpp:function:: Mat& Mat::operator = (const Mat& m)
+Provides matrix assignment operators.
 
-.. cpp:function:: Mat& Mat::operator = (const MatExpr_Base& expr)
+.. ocv:function:: Mat& Mat::operator = (const Mat& m)
 
-.. cpp:function:: Mat& operator = (const Scalar& s)
+.. ocv:function:: Mat& Mat::operator = (const MatExpr_Base& expr)
 
-    Provides matrix assignment operators.
+.. ocv:function:: Mat& Mat::operator = (const Scalar& s)
 
-    :param m: Assigned, right-hand-side matrix. Matrix assignment is an O(1) operation. This means that no data is copied but the data is shared and the reference counter, if any, is incremented. Before assigning new data, the old data is de-referenced via  :cpp:func:`Mat::release` .
+    :param m: Assigned, right-hand-side matrix. Matrix assignment is an O(1) operation. This means that no data is copied but the data is shared and the reference counter, if any, is incremented. Before assigning new data, the old data is de-referenced via  :ocv:func:`Mat::release` .
 
     :param expr: Assigned matrix expression object. As opposite to the first form of the assignment operation, the second form can reuse already allocated matrix if it has the right size and type to fit the matrix expression result. It is automatically handled by the real function that the matrix expressions is expanded to. For example,  ``C=A+B``  is expanded to  ``add(A, B, C)`` , and  :func:`add`  takes care of automatic  ``C``  reallocation.
 
@@ -813,18 +894,18 @@ These are available assignment operators. Since they all are very different, mak
 
 Mat::operator MatExpr
 -------------------------
-.. cpp:function:: Mat::operator MatExpr_<Mat, Mat>() const
+Provides a ``Mat`` -to- ``MatExpr`` cast operator.
 
-    Provides a ``Mat`` -to- ``MatExpr`` cast operator.
+.. ocv:function:: Mat::operator MatExpr_<Mat, Mat>() const
 
 The cast operator should not be called explicitly. It is used internally by the
 :ref:`MatrixExpressions` engine.
 
 Mat::row
 ------------
-.. cpp:function:: Mat Mat::row(int i) const
+Creates a matrix header for the specified matrix row.
 
-    Creates a matrix header for the specified matrix row.
+.. ocv:function:: Mat Mat::row(int i) const
 
     :param i: A 0-based row index.
 
@@ -838,79 +919,78 @@ The method makes a new header for the specified matrix row and returns it. This 
 
 .. note::
 
-	In the current implementation, the following code does not work as expected: ::
+    In the current implementation, the following code does not work as expected: ::
 
-		Mat A;
-		...
-		A.row(i) = A.row(j); // will not work
+        Mat A;
+        ...
+        A.row(i) = A.row(j); // will not work
 
 
-	This happens because ``A.row(i)`` forms a temporary header that is further assigned to another header. Remember that each of these operations is O(1), that is, no data is copied. Thus, the above assignment is not true if you may have expected the j-th row to be copied to the i-th row. To achieve that, you should either turn this simple assignment into an expression or use the
-	:cpp:func:`Mat::copyTo` method: ::
+    This happens because ``A.row(i)`` forms a temporary header that is further assigned to another header. Remember that each of these operations is O(1), that is, no data is copied. Thus, the above assignment is not true if you may have expected the j-th row to be copied to the i-th row. To achieve that, you should either turn this simple assignment into an expression or use the :ocv:func:`Mat::copyTo` method: ::
 
-		Mat A;
-		...
-		// works, but looks a bit obscure.
-		A.row(i) = A.row(j) + 0;
+        Mat A;
+        ...
+        // works, but looks a bit obscure.
+        A.row(i) = A.row(j) + 0;
 
-		// this is a bit longe, but the recommended method.
-		Mat Ai = A.row(i); M.row(j).copyTo(Ai);
+        // this is a bit longer, but the recommended method.
+        A.row(j).copyTo(A.row(i));
 
 Mat::col
 ------------
-.. cpp:function:: Mat Mat::col(int j) const
+Creates a matrix header for the specified matrix column.
 
-    Creates a matrix header for the specified matrix column.
+.. ocv:function:: Mat Mat::col(int j) const
 
     :param j: A 0-based column index.
 
 The method makes a new header for the specified matrix column and returns it. This is an O(1) operation, regardless of the matrix size. The underlying data of the new matrix is shared with the original matrix. See also the
-:cpp:func:`Mat::row` description.
+:ocv:func:`Mat::row` description.
 
 
 Mat::rowRange
 -----------------
-.. cpp:function:: Mat Mat::rowRange(int startrow, int endrow) const
+Creates a matrix header for the specified row span.
 
-.. cpp:function:: Mat Mat::rowRange(const Range& r) const
+.. ocv:function:: Mat Mat::rowRange(int startrow, int endrow) const
 
-    Creates a matrix header for the specified row span.
+.. ocv:function:: Mat Mat::rowRange(const Range& r) const
 
-    :param startrow: A 0-based start index of the row span.
+    :param startrow: An inclusive 0-based start index of the row span.
 
-    :param endrow: A 0-based ending index of the row span.
+    :param endrow: An exclusive 0-based ending index of the row span.
 
-    :param r: :cpp:class:`Range`  structure containing both the start and the end indices.
+    :param r: :ocv:class:`Range`  structure containing both the start and the end indices.
 
 The method makes a new header for the specified row span of the matrix. Similarly to
-:cpp:func:`Mat::row` and
-:cpp:func:`Mat::col` , this is an O(1) operation.
+:ocv:func:`Mat::row` and
+:ocv:func:`Mat::col` , this is an O(1) operation.
 
 Mat::colRange
 -----------------
-.. cpp:function:: Mat Mat::colRange(int startcol, int endcol) const
+Creates a matrix header for the specified row span.
 
-.. cpp:function:: Mat Mat::colRange(const Range& r) const
+.. ocv:function:: Mat Mat::colRange(int startcol, int endcol) const
 
-    Creates a matrix header for the specified row span.
+.. ocv:function:: Mat Mat::colRange(const Range& r) const
 
-    :param startcol: A 0-based start index of the column span.
+    :param startcol: An inclusive 0-based start index of the column span.
 
-    :param endcol: A 0-based ending index of the column span.
+    :param endcol: An exclusive 0-based ending index of the column span.
 
-    :param r: :cpp:class:`Range`  structure containing both the start and the end indices.
+    :param r: :ocv:class:`Range`  structure containing both the start and the end indices.
 
 The method makes a new header for the specified column span of the matrix. Similarly to
-:cpp:func:`Mat::row` and
-:cpp:func:`Mat::col` , this is an O(1) operation.
+:ocv:func:`Mat::row` and
+:ocv:func:`Mat::col` , this is an O(1) operation.
 
 Mat::diag
 -------------
-.. cpp:function:: Mat Mat::diag(int d) const
+Extracts a diagonal from a matrix, or creates a diagonal matrix.
 
-.. cpp:function:: static Mat Mat::diag(const Mat& matD)
+.. ocv:function:: Mat Mat::diag(int d) const
 
-    Extracts a diagonal from a matrix, or creates a diagonal matrix.
+.. ocv:function:: static Mat Mat::diag(const Mat& matD)
 
     :param d: Index of the diagonal, with the following values:
 
@@ -923,24 +1003,24 @@ Mat::diag
     :param matD: Single-column matrix that forms a diagonal matrix.
 
 The method makes a new header for the specified matrix diagonal. The new matrix is represented as a single-column matrix. Similarly to
-:cpp:func:`Mat::row` and
-:cpp:func:`Mat::col` , this is an O(1) operation.
+:ocv:func:`Mat::row` and
+:ocv:func:`Mat::col` , this is an O(1) operation.
 
 Mat::clone
 --------------
-.. cpp:function:: Mat Mat::clone() const
+Creates a full copy of the array and the underlying data.
 
-    Creates a full copy of the array and the underlying data.
+.. ocv:function:: Mat Mat::clone() const
 
 The method creates a full copy of the array. The original ``step[]`` is not taken into account. So, the array copy is a continuous array occupying ``total()*elemSize()`` bytes.
 
 
 Mat::copyTo
 ---------------
-.. cpp:function:: void Mat::copyTo( OutputArray m ) const
-.. cpp:function:: void Mat::copyTo( OutputArray m, InputArray mask ) const
+Copies the matrix to another one.
 
-    Copies the matrix to another one.
+.. ocv:function:: void Mat::copyTo( OutputArray m ) const
+.. ocv:function:: void Mat::copyTo( OutputArray m, InputArray mask ) const
 
     :param m: Destination matrix. If it does not have a proper size or type before the operation, it is reallocated.
 
@@ -955,11 +1035,13 @@ so that the destination matrix is reallocated if needed. While ``m.copyTo(m);`` 
 
 When the operation mask is specified, and the ``Mat::create`` call shown above reallocated the matrix, the newly allocated matrix is initialized with all zeros before copying the data.
 
+.. _Mat::convertTo:
+
 Mat::convertTo
 ------------------
-.. cpp:function:: void Mat::convertTo( OutputArray m, int rtype, double alpha=1, double beta=0 ) const
+Converts an array to another data type with optional scaling.
 
-    Converts an array to another datatype with optional scaling.
+.. ocv:function:: void Mat::convertTo( OutputArray m, int rtype, double alpha=1, double beta=0 ) const
 
     :param m: Destination matrix. If it does not have a proper size or type before the operation, it is reallocated.
 
@@ -969,7 +1051,7 @@ Mat::convertTo
 
     :param beta: Optional delta added to the scaled values.
 
-The method converts source pixel values to the target datatype. ``saturate_cast<>`` is applied at the end to avoid possible overflows:
+The method converts source pixel values to the target data type. ``saturate_cast<>`` is applied at the end to avoid possible overflows:
 
 .. math::
 
@@ -978,9 +1060,9 @@ The method converts source pixel values to the target datatype. ``saturate_cast<
 
 Mat::assignTo
 -----------------
-.. cpp:function:: void Mat::assignTo( Mat& m, int type=-1 ) const
+Provides a functional form of ``convertTo``.
 
-    Provides a functional form of ``convertTo``.
+.. ocv:function:: void Mat::assignTo( Mat& m, int type=-1 ) const
 
     :param m: Destination array.
 
@@ -991,9 +1073,9 @@ This is an internally used method called by the
 
 Mat::setTo
 --------------
-.. cpp:function:: Mat& Mat::setTo(const Scalar& s, InputArray mask=noArray())
+Sets all or some of the array elements to the specified value.
 
-    Sets all or some of the array elements to the specified value.
+.. ocv:function:: Mat& Mat::setTo(const Scalar& s, InputArray mask=noArray())
 
     :param s: Assigned scalar converted to the actual array type.
 
@@ -1002,9 +1084,9 @@ Mat::setTo
 
 Mat::reshape
 ----------------
-.. cpp:function:: Mat Mat::reshape(int cn, int rows=0) const
+Changes the shape and/or the number of channels of a 2D matrix without copying the data.
 
-    Changes the shape and/or the number of channels of a 2D matrix without copying the data.
+.. ocv:function:: Mat Mat::reshape(int cn, int rows=0) const
 
     :param cn: New number of channels. If the parameter is 0, the number of channels remains the same.
 
@@ -1017,7 +1099,7 @@ The method makes a new matrix header for ``*this`` elements. The new matrix may 
 
 *
     No data is copied. That is, this is an O(1) operation. Consequently, if you change the number of rows, or the operation changes the indices of elements row  in some other way, the matrix must be continuous. See
-    :cpp:func:`Mat::isContinuous` .
+    :ocv:func:`Mat::isContinuous` .
 
 For example, if there is a set of 3D points stored as an STL vector, and you want to represent the points as a ``3xN`` matrix, do the following: ::
 
@@ -1035,9 +1117,9 @@ For example, if there is a set of 3D points stored as an STL vector, and you wan
 
 Mat::t
 ----------
-.. cpp:function:: MatExpr Mat::t() const
+Transposes a matrix.
 
-    Transposes a matrix.
+.. ocv:function:: MatExpr Mat::t() const
 
 The method performs matrix transposition by means of matrix expressions. It does not perform the actual transposition but returns a temporary matrix transposition object that can be further used as a part of more complex matrix expressions or can be assigned to a matrix: ::
 
@@ -1047,9 +1129,9 @@ The method performs matrix transposition by means of matrix expressions. It does
 
 Mat::inv
 ------------
-.. cpp:function:: MatExpr Mat::inv(int method=DECOMP_LU) const
+Inverses a matrix.
 
-    Inverses a matrix.
+.. ocv:function:: MatExpr Mat::inv(int method=DECOMP_LU) const
 
     :param method: Matrix inversion method. Possible values are the following:
 
@@ -1064,9 +1146,9 @@ The method performs a matrix inversion by means of matrix expressions. This mean
 
 Mat::mul
 ------------
-.. cpp:function:: MatExpr Mat::mul(InputArray m, double scale=1) const
+Performs an element-wise multiplication or division of the two matrices.
 
-    Performs an element-wise multiplication or division of the two matrices.
+.. ocv:function:: MatExpr Mat::mul(InputArray m, double scale=1) const
 
     :param m: Another array of the same type and the same size as ``*this``, or a matrix expression.
 
@@ -1081,9 +1163,9 @@ Example: ::
 
 Mat::cross
 --------------
-.. cpp:function:: Mat Mat::cross(InputArray m) const
+Computes a cross-product of two 3-element vectors.
 
-    Computes a cross-product of two 3-element vectors.
+.. ocv:function:: Mat Mat::cross(InputArray m) const
 
     :param m: Another cross-product operand.
 
@@ -1092,9 +1174,9 @@ The method computes a cross-product of two 3-element vectors. The vectors must b
 
 Mat::dot
 ------------
-.. cpp:function:: double Mat::dot(InputArray m) const
+Computes a dot-product of two vectors.
 
-    Computes a dot-product of two vectors.
+.. ocv:function:: double Mat::dot(InputArray m) const
 
     :param m: Another dot-product operand.
 
@@ -1103,11 +1185,11 @@ The method computes a dot-product of two matrices. If the matrices are not singl
 
 Mat::zeros
 --------------
-.. cpp:function:: static MatExpr Mat::zeros(int rows, int cols, int type)
-.. cpp:function:: static MatExpr Mat::zeros(Size size, int type)
-.. cpp:function:: static MatExpr Mat::zeros(int ndims, const int* sizes, int type)
+Returns a zero array of the specified size and type.
 
-    Returns a zero array of the specified size and type.
+.. ocv:function:: static MatExpr Mat::zeros(int rows, int cols, int type)
+.. ocv:function:: static MatExpr Mat::zeros(Size size, int type)
+.. ocv:function:: static MatExpr Mat::zeros(int ndims, const int* sizes, int type)
 
     :param ndims: Array dimensionality.
 
@@ -1116,7 +1198,7 @@ Mat::zeros
     :param cols: Number of columns.
 
     :param size: Alternative to the matrix size specification ``Size(cols, rows)``  .   
-	
+    
     :param sizes: Array of integers specifying the array shape.
 
     :param type: Created matrix type.
@@ -1132,11 +1214,11 @@ In the example above, a new matrix is allocated only if ``A`` is not a 3x3 float
 
 Mat::ones
 -------------
-.. cpp:function:: static MatExpr Mat::ones(int rows, int cols, int type)
-.. cpp:function:: static MatExpr Mat::ones(Size size, int type)
-.. cpp:function:: static MatExpr Mat::ones(int ndims, const int* sizes, int type)
+Returns an array of all 1's of the specified size and type.
 
-    Returns an array of all 1's of the specified size and type.
+.. ocv:function:: static MatExpr Mat::ones(int rows, int cols, int type)
+.. ocv:function:: static MatExpr Mat::ones(Size size, int type)
+.. ocv:function:: static MatExpr Mat::ones(int ndims, const int* sizes, int type)
 
     :param ndims: Array dimensionality.
 
@@ -1145,13 +1227,13 @@ Mat::ones
     :param cols: Number of columns.
 
     :param size: Alternative to the matrix size specification  ``Size(cols, rows)``  .   
-	
-	:param sizes: Array of integers specifying the array shape.
+    
+    :param sizes: Array of integers specifying the array shape.
 
     :param type: Created matrix type.
 
 The method returns a Matlab-style 1's array initializer, similarly to
-:cpp:func:`Mat::zeros`. Note that using this method you can initialize an array with an arbitrary value, using the following Matlab idiom: ::
+:ocv:func:`Mat::zeros`. Note that using this method you can initialize an array with an arbitrary value, using the following Matlab idiom: ::
 
     Mat A = Mat::ones(100, 100, CV_8U)*3; // make 100x100 matrix filled with 3.
 
@@ -1161,22 +1243,22 @@ The above operation does not form a 100x100 matrix of 1's and then multiply it b
 
 Mat::eye
 ------------
-.. cpp:function:: static MatExpr Mat::eye(int rows, int cols, int type)
-.. cpp:function:: static MatExpr Mat::eye(Size size, int type)
+Returns an identity matrix of the specified size and type.
 
-    Returns an identity matrix of the specified size and type.
+.. ocv:function:: static MatExpr Mat::eye(int rows, int cols, int type)
+.. ocv:function:: static MatExpr Mat::eye(Size size, int type)
 
     :param rows: Number of rows.
 
     :param cols: Number of columns.
 
     :param size: Alternative matrix size specification as  ``Size(cols, rows)`` .     
-	
+    
     :param type: Created matrix type.
 
 The method returns a Matlab-style identity matrix initializer, similarly to
-:cpp:func:`Mat::zeros`. Similarly to 
-:cpp:func:`Mat::ones`, you can use a scale operation to create a scaled identity matrix efficiently: ::
+:ocv:func:`Mat::zeros`. Similarly to 
+:ocv:func:`Mat::ones`, you can use a scale operation to create a scaled identity matrix efficiently: ::
 
     // make a 4x4 diagonal matrix with 0.1's on the diagonal.
     Mat A = Mat::eye(4, 4, CV_32F)*0.1;
@@ -1184,11 +1266,11 @@ The method returns a Matlab-style identity matrix initializer, similarly to
 
 Mat::create
 ---------------
-.. cpp:function:: void Mat::create(int rows, int cols, int type)
-.. cpp:function:: void Mat::create(Size size, int type)
-.. cpp:function:: void Mat::create(int ndims, const int* sizes, int type)
+Allocates new array data if needed.
 
-    Allocates new array data if needed.
+.. ocv:function:: void Mat::create(int rows, int cols, int type)
+.. ocv:function:: void Mat::create(Size size, int type)
+.. ocv:function:: void Mat::create(int ndims, const int* sizes, int type)
 
     :param ndims: New array dimensionality.
 
@@ -1197,7 +1279,7 @@ Mat::create
     :param cols: New number of columns.
 
     :param size: Alternative new matrix size specification:  ``Size(cols, rows)``     
-	
+    
     :param sizes: Array of integers specifying a new array shape.
 
     :param type: New matrix type.
@@ -1206,8 +1288,8 @@ This is one of the key ``Mat`` methods. Most new-style OpenCV functions and meth
 
 #.
     If the current array shape and the type match the new ones, return immediately. Otherwise, de-reference the previous data by calling
-    :cpp:func:`Mat::release`. 
-	
+    :ocv:func:`Mat::release`. 
+    
 #.
     Initialize the new header.
 
@@ -1238,31 +1320,31 @@ because ``cvtColor`` , as well as the most of OpenCV functions, calls ``Mat::cre
 
 Mat::addref
 ---------------
-.. cpp:function:: void Mat::addref()
+Increments the reference counter.
 
-    Increments the reference counter.
+.. ocv:function:: void Mat::addref()
 
 The method increments the reference counter associated with the matrix data. If the matrix header points to an external data set (see
-:cpp:func:`Mat::Mat` ), the reference counter is NULL, and the method has no effect in this case. Normally, to avoid memory leaks, the method should not be called explicitly. It is called implicitly by the matrix assignment operator. The reference counter increment is an atomic operation on the platforms that support it. Thus, it is safe to operate on the same matrices asynchronously in different threads.
+:ocv:func:`Mat::Mat` ), the reference counter is NULL, and the method has no effect in this case. Normally, to avoid memory leaks, the method should not be called explicitly. It is called implicitly by the matrix assignment operator. The reference counter increment is an atomic operation on the platforms that support it. Thus, it is safe to operate on the same matrices asynchronously in different threads.
 
 
 Mat::release
 ----------------
-.. cpp:function:: void Mat::release()
+Decrements the reference counter and deallocates the matrix if needed.
 
-    Decrements the reference counter and deallocates the matrix if needed.
+.. ocv:function:: void Mat::release()
 
 The method decrements the reference counter associated with the matrix data. When the reference counter reaches 0, the matrix data is deallocated and the data and the reference counter pointers are set to NULL's. If the matrix header points to an external data set (see
-:cpp:func:`Mat::Mat` ), the reference counter is NULL, and the method has no effect in this case.
+:ocv:func:`Mat::Mat` ), the reference counter is NULL, and the method has no effect in this case.
 
 This method can be called manually to force the matrix data deallocation. But since this method is automatically called in the destructor, or by any other method that changes the data pointer, it is usually not needed. The reference counter decrement and check for 0 is an atomic operation on the platforms that support it. Thus, it is safe to operate on the same matrices asynchronously in different threads.
 
 Mat::resize
 ---------------
-.. cpp:function:: void Mat::resize( size_t sz )
-.. cpp:function:: void Mat::resize( size_t sz, const Scalar& s )
+Changes the number of matrix rows.
 
-    Changes the number of matrix rows.
+.. ocv:function:: void Mat::resize( size_t sz )
+.. ocv:function:: void Mat::resize( size_t sz, const Scalar& s )
 
     :param sz: New number of rows.
     :param s: Value assigned to the newly added elements.
@@ -1272,9 +1354,9 @@ The methods change the number of matrix rows. If the matrix is reallocated, the 
 
 Mat::reserve
 ---------------
-.. cpp:function:: void Mat::reserve( size_t sz )
+Reserves space for the certain number of rows.
 
-    Reserves space for the certain number of rows.
+.. ocv:function:: void Mat::reserve( size_t sz )
 
     :param sz: Number of rows.
 
@@ -1282,10 +1364,10 @@ The method reserves space for ``sz`` rows. If the matrix already has enough spac
 
 Mat::push_back
 --------------
-.. cpp:function:: template<typename T> void Mat::push_back(const T& elem)
-.. cpp:function:: void Mat::push_back(const Mat& elem)
+Adds elements to the bottom of the matrix.
 
-    Adds elements to the bottom of the matrix.
+.. ocv:function:: template<typename T> void Mat::push_back(const T& elem)
+.. ocv:function:: void Mat::push_back(const Mat& elem)
 
     :param elem: Added element(s).
 
@@ -1293,9 +1375,9 @@ The methods add one or more elements to the bottom of the matrix. They emulate t
 
 Mat::pop_back
 -------------
-.. cpp:function:: template<typename T> void Mat::pop_back(size_t nelems=1)
+Removes elements from the bottom of the matrix.
 
-    Removes elements from the bottom of the matrix.
+.. ocv:function:: template<typename T> void Mat::pop_back(size_t nelems=1)
 
     :param nelems: Number of removed rows. If it is greater than the total number of rows, an exception is thrown.
 
@@ -1304,26 +1386,26 @@ The method removes one or more rows from the bottom of the matrix.
 
 Mat::locateROI
 ------------------
-.. cpp:function:: void Mat::locateROI( Size& wholeSize, Point& ofs ) const
+Locates the matrix header within a parent matrix.
 
-    Locates the matrix header within a parent matrix.
+.. ocv:function:: void Mat::locateROI( Size& wholeSize, Point& ofs ) const
 
-    :param wholeSize: Output parameter that contains the size of the whole matrix containing ``*this`` is a part.
+    :param wholeSize: Output parameter that contains the size of the whole matrix containing ``*this`` as a part.
 
     :param ofs: Output parameter that contains an offset of  ``*this``  inside the whole matrix.
 
 After you extracted a submatrix from a matrix using
-:cpp:func:`Mat::row`,
-:cpp:func:`Mat::col`,
-:cpp:func:`Mat::rowRange`,
-:cpp:func:`Mat::colRange` , and others, the resultant submatrix points just to the part of the original big matrix. However, each submatrix contains information (represented by ``datastart`` and ``dataend`` fields) that helps reconstruct the original matrix size and the position of the extracted submatrix within the original matrix. The method ``locateROI`` does exactly that.
+:ocv:func:`Mat::row`,
+:ocv:func:`Mat::col`,
+:ocv:func:`Mat::rowRange`,
+:ocv:func:`Mat::colRange` , and others, the resultant submatrix points just to the part of the original big matrix. However, each submatrix contains information (represented by ``datastart`` and ``dataend`` fields) that helps reconstruct the original matrix size and the position of the extracted submatrix within the original matrix. The method ``locateROI`` does exactly that.
 
 
 Mat::adjustROI
 ------------------
-.. cpp:function:: Mat& Mat::adjustROI( int dtop, int dbottom, int dleft, int dright )
+Adjusts a submatrix size and position within the parent matrix.
 
-    Adjusts a submatrix size and position within the parent matrix.
+.. ocv:function:: Mat& Mat::adjustROI( int dtop, int dbottom, int dleft, int dright )
 
     :param dtop: Shift of the top submatrix boundary upwards.
 
@@ -1334,52 +1416,53 @@ Mat::adjustROI
     :param dright: Shift of the right submatrix boundary to the right.
 
 The method is complimentary to 
-:cpp:func:`Mat::locateROI` . The typical use of these functions is to determine the submatrix position within the parent matrix and then shift the position somehow. Typically, it can be required for filtering operations when pixels outside of the ROI should be taken into account. When all the method parameters are positive, the ROI needs to grow in all directions by the specified amount, for example: ::
+:ocv:func:`Mat::locateROI` . The typical use of these functions is to determine the submatrix position within the parent matrix and then shift the position somehow. Typically, it can be required for filtering operations when pixels outside of the ROI should be taken into account. When all the method parameters are positive, the ROI needs to grow in all directions by the specified amount, for example: ::
 
     A.adjustROI(2, 2, 2, 2);
 
 
 In this example, the matrix size is increased by 4 elements in each direction. The matrix is shifted by 2 elements to the left and 2 elements up, which brings in all the necessary pixels for the filtering with the 5x5 kernel.
 
-It is your responsibility to make sure ``adjustROI`` does not cross the parent matrix boundary. If it does, the function signals an error.
+``adjustROI`` forces the adjusted ROI to be inside of the parent matrix that is boundaries of the adjusted ROI are constrained by boundaries of the parent matrix. For example, if the submatrix ``A`` is located in the first row of a parent matrix and you called ``A.adjustROI(2, 2, 2, 2)`` then ``A`` will not be increased in the upward direction.
 
 The function is used internally by the OpenCV filtering functions, like
-:cpp:func:`filter2D` , morphological operations, and so on.
+:ocv:func:`filter2D` , morphological operations, and so on.
 
-See Also:
-:cpp:func:`copyMakeBorder` 
+.. seealso:: :ocv:func:`copyMakeBorder` 
 
 
 Mat::operator()
 -------------------
-.. cpp:function:: Mat Mat::operator()( Range rowRange, Range colRange ) const
+Extracts a rectangular submatrix.
 
-.. cpp:function:: Mat Mat::operator()( const Rect& roi ) const
+.. ocv:function:: Mat Mat::operator()( Range rowRange, Range colRange ) const
 
-.. cpp:function:: Mat Mat::operator()( const Ranges* ranges ) const
+.. ocv:function:: Mat Mat::operator()( const Rect& roi ) const
 
-    Extracts a rectangular submatrix.
+.. ocv:function:: Mat Mat::operator()( const Ranges* ranges ) const
+
 
     :param rowRange: Start and end row of the extracted submatrix. The upper boundary is not included. To select all the rows, use ``Range::all()``.    
-	
+    
     :param colRange: Start and end column of the extracted submatrix. The upper boundary is not included. To select all the columns, use  ``Range::all()``.    
-	
+    
     :param roi: Extracted submatrix specified as a rectangle.
 
     :param ranges: Array of selected ranges along each array dimension.
 
 The operators make a new header for the specified sub-array of ``*this`` . They are the most generalized forms of
-:cpp:func:`Mat::row`,
-:cpp:func:`Mat::col`,
-:cpp:func:`Mat::rowRange`, and
-:cpp:func:`Mat::colRange` . For example, ``A(Range(0, 10), Range::all())`` is equivalent to ``A.rowRange(0, 10)`` . Similarly to all of the above, the operators are O(1) operations, that is, no matrix data is copied.
+:ocv:func:`Mat::row`,
+:ocv:func:`Mat::col`,
+:ocv:func:`Mat::rowRange`, and
+:ocv:func:`Mat::colRange` . For example, ``A(Range(0, 10), Range::all())`` is equivalent to ``A.rowRange(0, 10)`` . Similarly to all of the above, the operators are O(1) operations, that is, no matrix data is copied.
 
 
 Mat::operator CvMat
 -----------------------
-.. cpp:function:: Mat::operator CvMat() const
+Creates the ``CvMat`` header for the matrix.
 
-    Creates the ``CvMat`` header for the matrix.
+.. ocv:function:: Mat::operator CvMat() const
+
 
 The operator creates the ``CvMat`` header for the matrix without copying the underlying data. The reference counter is not taken into account by this operation. Thus, you should make sure than the original matrix is not deallocated while the ``CvMat`` header is used. The operator is useful for intermixing the new and the old OpenCV API's, for example: ::
 
@@ -1395,30 +1478,30 @@ where ``mycvOldFunc`` is a function written to work with OpenCV 1.x data structu
 
 Mat::operator IplImage
 --------------------------
-.. cpp:function:: Mat::operator IplImage() const
+Creates the ``IplImage`` header for the matrix.
 
-    Creates the ``IplImage`` header for the matrix.
+.. ocv:function:: Mat::operator IplImage() const
 
 The operator creates the ``IplImage`` header for the matrix without copying the underlying data. You should make sure than the original matrix is not deallocated while the ``IplImage`` header is used. Similarly to ``Mat::operator CvMat`` , the operator is useful for intermixing the new and the old OpenCV API's.
 
 Mat::total
 --------------
-.. cpp:function:: size_t Mat::total() const
+Returns the total number of array elements.
 
-    Returns the total number of array elements.
+.. ocv:function:: size_t Mat::total() const
 
 The method returns the number of array elements (a number of pixels if the array represents an image).
 
 Mat::isContinuous
 ---------------------
-.. cpp:function:: bool Mat::isContinuous() const
+Reports whether the matrix is continuous or not.
 
-    Reports whether the matrix is continuous or not.
+.. ocv:function:: bool Mat::isContinuous() const
 
 The method returns ``true`` if the matrix elements are stored continuously without gaps at the end of each row. Otherwise, it returns ``false``. Obviously, ``1x1`` or ``1xN`` matrices are always continuous. Matrices created with
-:cpp:func:`Mat::create` are always continuous. But if you extract a part of the matrix using
-:cpp:func:`Mat::col`,
-:cpp:func:`Mat::diag` , and so on, or constructed a matrix header for externally allocated data, such matrices may no longer have this property.
+:ocv:func:`Mat::create` are always continuous. But if you extract a part of the matrix using
+:ocv:func:`Mat::col`,
+:ocv:func:`Mat::diag` , and so on, or constructed a matrix header for externally allocated data, such matrices may no longer have this property.
 
 The continuity flag is stored as a bit in the ``Mat::flags`` field and is computed automatically when you construct a matrix header. Thus, the continuity check is a very fast operation, though theoretically it could be done as follows: ::
 
@@ -1477,41 +1560,41 @@ The method is used in quite a few of OpenCV functions. The point is that element
 This approach, while being very simple, can boost the performance of a simple element-operation by 10-20 percents, especially if the image is rather small and the operation is quite simple.
 
 Another OpenCV idiom in this function, a call of
-:cpp:func:`Mat::create` for the destination array, that allocates the destination array unless it already has the proper size and type. And while the newly allocated arrays are always continuous, you still need to check the destination array because :cpp:func:`create` does not always allocate a new matrix.
+:ocv:func:`Mat::create` for the destination array, that allocates the destination array unless it already has the proper size and type. And while the newly allocated arrays are always continuous, you still need to check the destination array because :ocv:func:`Mat::create` does not always allocate a new matrix.
 
 
 Mat::elemSize
------------------
-.. cpp:function:: size_t Mat::elemSize(void) const
+-------------
+Returns  the matrix element size in bytes.
 
-    Returns  the matrix element size in bytes.
+.. ocv:function:: size_t Mat::elemSize() const
 
 The method returns the matrix element size in bytes. For example, if the matrix type is ``CV_16SC3`` , the method returns ``3*sizeof(short)`` or 6.
 
 
 Mat::elemSize1
-------------------
-.. cpp:function:: size_t Mat::elemSize() const
+--------------
+Returns the size of each matrix element channel in bytes.
 
-    Returns the size of each matrix element channel in bytes.
+.. ocv:function:: size_t Mat::elemSize1() const
 
 The method returns the matrix element channel size in bytes, that is, it ignores the number of channels. For example, if the matrix type is ``CV_16SC3`` , the method returns ``sizeof(short)`` or 2.
 
 
 Mat::type
--------------
-.. cpp:function:: int Mat::type() const
+---------
+Returns the type of a matrix element.
 
-    Returns the type of a matrix element.
+.. ocv:function:: int Mat::type() const
 
 The method returns a matrix element type. This is an identifier compatible with the ``CvMat`` type system, like ``CV_16SC3`` or 16-bit signed 3-channel array, and so on.
 
 
 Mat::depth
 --------------
-.. cpp:function:: int Mat::depth() const
+Returns the depth of a matrix element.
 
-    Returns the depth of a matrix element.
+.. ocv:function:: int Mat::depth() const
 
 The method returns the identifier of the matrix element depth (the type of each individual channel). For example, for a 16-bit signed 3-channel array, the method returns ``CV_16S`` . A complete list of matrix types contains the following values:
 
@@ -1532,87 +1615,89 @@ The method returns the identifier of the matrix element depth (the type of each 
 
 Mat::channels
 -----------------
-.. cpp:function:: int Mat::channels() const
+Returns the number of matrix channels.
 
-    Returns the number of matrix channels.
+.. ocv:function:: int Mat::channels() const
 
 The method returns the number of matrix channels.
 
 
 Mat::step1
 --------------
-.. cpp:function:: size_t Mat::step1() const
+Returns a normalized step.
 
-    Returns a normalized step.
+.. ocv:function:: size_t Mat::step1() const
 
 The method returns a matrix step divided by
-:cpp:func:`Mat::elemSize1()` . It can be useful to quickly access an arbitrary matrix element.
+:ocv:func:`Mat::elemSize1()` . It can be useful to quickly access an arbitrary matrix element.
 
 
 Mat::size
 -------------
-.. cpp:function:: Size Mat::size() const
+Returns a matrix size.
 
-    Returns a matrix size.
+.. ocv:function:: Size Mat::size() const
 
-The method returns a matrix size: ``Size(cols, rows)`` .
+The method returns a matrix size: ``Size(cols, rows)`` . When the matrix is more than 2-dimensional, the returned size is (-1, -1).
 
 
 Mat::empty
 --------------
-.. cpp:function:: bool Mat::empty() const
+Returns ``true`` if the array has no elements.
 
-    Returns ``true`` if the array has no elemens.
+.. ocv:function:: bool Mat::empty() const
 
 The method returns ``true`` if ``Mat::total()`` is 0 or if ``Mat::data`` is NULL. Because of ``pop_back()`` and ``resize()`` methods ``M.total() == 0`` does not imply that ``M.data == NULL`` .
 
 
 Mat::ptr
 ------------
-.. cpp:function:: uchar* Mat::ptr(int i=0)
+Returns a pointer to the specified matrix row.
 
-.. cpp:function:: const uchar* Mat::ptr(int i=0) const
+.. ocv:function:: uchar* Mat::ptr(int i=0)
 
-.. cpp:function:: template<typename _Tp> _Tp* Mat::ptr(int i=0)
+.. ocv:function:: const uchar* Mat::ptr(int i=0) const
 
-.. cpp:function:: template<typename _Tp> const _Tp* Mat::ptr(int i=0) const
+.. ocv:function:: template<typename _Tp> _Tp* Mat::ptr(int i=0)
 
-    Returns a pointer to the specified matrix row.
+.. ocv:function:: template<typename _Tp> const _Tp* Mat::ptr(int i=0) const
 
     :param i: A 0-based row index.
 
 The methods return ``uchar*`` or typed pointer to the specified matrix row. See the sample in
-:cpp:func:`Mat::isContinuous` () to know how to use these methods.
+:ocv:func:`Mat::isContinuous` to know how to use these methods.
 
 
 Mat::at
 -----------
-.. cpp:function:: template<typename T> T& Mat::at(int i) const
+Returns a reference to the specified array element.
 
-.. cpp:function:: template<typename T> const T& Mat::at(int i) const
+.. ocv:function:: template<typename T> T& Mat::at(int i) const
 
-.. cpp:function:: template<typename T> T& Mat::at(int i, int j)
+.. ocv:function:: template<typename T> const T& Mat::at(int i) const
 
-.. cpp:function:: template<typename T> const T& Mat::at(int i, int j) const
+.. ocv:function:: template<typename T> T& Mat::at(int i, int j)
 
-.. cpp:function:: template<typename T> T& Mat::at(Point pt)
+.. ocv:function:: template<typename T> const T& Mat::at(int i, int j) const
 
-.. cpp:function:: template<typename T> const T& Mat::at(Point pt) const
+.. ocv:function:: template<typename T> T& Mat::at(Point pt)
 
-.. cpp:function:: template<typename T> T& Mat::at(int i, int j, int k)
+.. ocv:function:: template<typename T> const T& Mat::at(Point pt) const
 
-.. cpp:function:: template<typename T> const T& Mat::at(int i, int j, int k) const
+.. ocv:function:: template<typename T> T& Mat::at(int i, int j, int k)
 
-.. cpp:function:: template<typename T> T& Mat::at(const int* idx)
+.. ocv:function:: template<typename T> const T& Mat::at(int i, int j, int k) const
 
-.. cpp:function:: template<typename T> const T& Mat::at(const int* idx) const
+.. ocv:function:: template<typename T> T& Mat::at(const int* idx)
 
-    Returns a reference to the specified array element.
+.. ocv:function:: template<typename T> const T& Mat::at(const int* idx) const
 
-    :param i, j, k: Indices along the dimensions 0, 1, and 2, respectively.
+    :param i: Index along the dimension 0
+    :param j: Index along the dimension 1
+    :param k: Index along the dimension 2
 
     :param pt: Element position specified as  ``Point(j,i)`` .    
-	
+
     :param idx: Array of  ``Mat::dims``  indices.
 
 The template methods return a reference to the specified array element. For the sake of higher performance, the index range checks are only performed in the Debug configuration.
@@ -1630,9 +1715,11 @@ The example below initializes a Hilbert matrix: ::
 
 Mat::begin
 --------------
-.. cpp:function:: template<typename _Tp> MatIterator_<_Tp> Mat::begin() template<typename _Tp> MatConstIterator_<_Tp> Mat::begin() const
+Returns the matrix iterator and sets it to the first matrix element.
 
-    Returns the matrix iterator and sets it to the first matrix element.
+.. ocv:function:: template<typename _Tp> MatIterator_<_Tp> Mat::begin()
+
+.. ocv:function:: template<typename _Tp> MatConstIterator_<_Tp> Mat::begin() const
 
 The methods return the matrix read-only or read-write iterators. The use of matrix iterators is very similar to the use of bi-directional STL iterators. In the example below, the alpha blending function is rewritten using the matrix iterators: ::
 
@@ -1669,19 +1756,20 @@ The methods return the matrix read-only or read-write iterators. The use of matr
 
 Mat::end
 ------------
-.. cpp:function:: template<typename _Tp> MatIterator_<_Tp> Mat::end()
-.. cpp:function:: template<typename _Tp> MatConstIterator_<_Tp> Mat::end() const
+Returns the matrix iterator and sets it to the after-last matrix element.
 
-    Returns the matrix iterator and sets it to the after-last matrix element.
+.. ocv:function:: template<typename _Tp> MatIterator_<_Tp> Mat::end()
+
+.. ocv:function:: template<typename _Tp> MatConstIterator_<_Tp> Mat::end() const
 
 The methods return the matrix read-only or read-write iterators, set to the point following the last matrix element.
 
 Mat\_
 -----
-.. cpp:class:: Mat_
+.. ocv:class:: Mat_
 
 Template matrix class derived from
-:cpp:class:`Mat` . ::
+:ocv:class:`Mat` . ::
 
     template<typename _Tp> class Mat_ : public Mat
     {
@@ -1726,10 +1814,88 @@ To use ``Mat_`` for multi-channel images/matrices, pass ``Vec`` as a ``Mat_`` pa
             img(i,j)[2] ^= (uchar)(i ^ j);
 
 
+InputArray
+----------
+
+This is the proxy class for passing read-only input arrays into OpenCV functions. It is defined as ::
+
+    typedef const _InputArray& InputArray;
+    
+where ``_InputArray`` is a class that can be constructed from ``Mat``, ``Mat_<T>``, ``Matx<T, m, n>``, ``std::vector<T>``, ``std::vector<std::vector<T> >`` or ``std::vector<Mat>``. It can also be constructed from a matrix expression.
+
+Since this is mostly implementation-level class, and its interface may change in future versions, we do not describe it in details. There are a few key things, though, that should be kept in mind:
+
+  * When you see in the reference manual or in OpenCV source code a function that takes ``InputArray``, it means that you can actually pass ``Mat``, ``Matx``, ``vector<T>`` etc. (see above the complete list).
+  
+  * Optional input arguments: If some of the input arrays may be empty, pass ``cv::noArray()`` (or simply ``cv::Mat()`` as you probably did before).
+
+  * The class is designed solely for passing parameters. That is, normally you *should not* declare class members, local and global variables of this type.
+  
+  * If you want to design your own function or a class method that can operate of arrays of multiple types, you can use ``InputArray`` (or ``OutputArray``) for the respective parameters. Inside a function you should use ``_InputArray::getMat()`` method to construct a matrix header for the array (without copying data). ``_InputArray::kind()`` can be used to distinguish ``Mat`` from ``vector<>`` etc., but normally it is not needed.
+  
+Here is how you can use a function that takes ``InputArray`` ::
+
+    std::vector<Point2f> vec;
+    // points or a circle
+    for( int i = 0; i < 30; i++ )
+        vec.push_back(Point2f((float)(100 + 30*cos(i*CV_PI*2/5)),
+                              (float)(100 - 30*sin(i*CV_PI*2/5))));
+    cv::transform(vec, vec, cv::Matx23f(0.707, -0.707, 10, 0.707, 0.707, 20));
+
+That is, we form an STL vector containing points, and apply in-place affine transformation to the vector using the 2x3 matrix created inline as ``Matx<float, 2, 3>`` instance.
+
+Here is how such a function can be implemented (for simplicity, we implement a very specific case of it, according to the assertion statement inside) ::
+
+    void myAffineTransform(InputArray _src, OutputArray _dst, InputArray _m)
+    {
+        // get Mat headers for input arrays. This is O(1) operation,
+        // unless _src and/or _m are matrix expressions.
+        Mat src = _src.getMat(), m = _m.getMat();
+        CV_Assert( src.type() == CV_32FC2 && m.type() == CV_32F && m.size() == Size(3, 2) );
+        
+        // [re]create the output array so that it has the proper size and type.
+        // In case of Mat it calls Mat::create, in case of STL vector it calls vector::resize.
+        _dst.create(src.size(), src.type());
+        Mat dst = _dst.getMat();
+        
+        for( int i = 0; i < src.rows; i++ )
+            for( int j = 0; j < src.cols; j++ )
+            {
+                Point2f pt = src.at<Point2f>(i, j);
+                dst.at<Point2f>(i, j) = Point2f(m.at<float>(0, 0)*pt.x +
+                                                m.at<float>(0, 1)*pt.y +
+                                                m.at<float>(0, 2),
+                                                m.at<float>(1, 0)*pt.x +
+                                                m.at<float>(1, 1)*pt.y +
+                                                m.at<float>(1, 2));
+            }
+    }
+
+There is another related type, ``InputArrayOfArrays``, which is currently defined as a synonym for ``InputArray``: ::
+
+    typedef InputArray InputArrayOfArrays;
+    
+It denotes function arguments that are either vectors of vectors or vectors of matrices. A separate synonym is needed to generate Python/Java etc. wrappers properly. At the function implementation level their use is similar, but ``_InputArray::getMat(idx)`` should be used to get header for the idx-th component of the outer vector and ``_InputArray::size().area()`` should be used to find the number of components (vectors/matrices) of the outer vector.
+
+
+OutputArray
+-----------
+
+This type is very similar to ``InputArray`` except that it is used for input/output and output function parameters. Just like with ``InputArray``, OpenCV users should not care about ``OutputArray``, they just pass ``Mat``, ``vector<T>`` etc. to the functions. The same limitation as for ``InputArray``: **Do not explicitly create OutputArray instances** applies here too.
+
+If you want to make your function polymorphic (i.e. accept different arrays as output parameters), it is also not very difficult. Take the sample above as the reference. Note that ``_OutputArray::create()`` needs to be called before ``_OutputArray::getMat()``. This way you guarantee that the output array is properly allocated.
+
+Optional output parameters. If you do not need certain output array to be computed and returned to you, pass ``cv::noArray()``, just like you would in the case of optional input array. At the implementation level, use ``_OutputArray::needed()`` to check if certain output array needs to be computed or not.
+
+There are several synonyms for ``OutputArray`` that are used to assist automatic Python/Java/... wrapper generators: ::
+
+    typedef OutputArray OutputArrayOfArrays;
+    typedef OutputArray InputOutputArray;
+    typedef OutputArray InputOutputArrayOfArrays;
 
 NAryMatIterator
---------------
-.. cpp:class:: NAryMatIterator
+---------------
+.. ocv:class:: NAryMatIterator
 
 n-ary multi-dimensional array iterator. ::
 
@@ -1800,7 +1966,7 @@ The example below illustrates how you can compute a normalized and threshold 3D 
 
 SparseMat
 ---------
-.. cpp:class:: SparseMat
+.. ocv:class:: SparseMat
 
 Sparse n-dimensional array. ::
 
@@ -1999,7 +2165,7 @@ Sparse n-dimensional array. ::
 
 
 The class ``SparseMat`` represents multi-dimensional sparse numerical arrays. Such a sparse array can store elements of any type that
-:cpp:class:`Mat` can store. *Sparse* means that only non-zero elements are stored (though, as a result of operations on a sparse matrix, some of its stored elements can actually become 0. It is up to you to detect such elements and delete them using ``SparseMat::erase`` ). The non-zero elements are stored in a hash table that grows when it is filled so that the search time is O(1) in average (regardless of whether element is there or not). Elements can be accessed using the following methods:
+:ocv:class:`Mat` can store. *Sparse* means that only non-zero elements are stored (though, as a result of operations on a sparse matrix, some of its stored elements can actually become 0. It is up to you to detect such elements and delete them using ``SparseMat::erase`` ). The non-zero elements are stored in a hash table that grows when it is filled so that the search time is O(1) in average (regardless of whether element is there or not). Elements can be accessed using the following methods:
 
 *
     Query operations ( ``SparseMat::ptr``     and the higher-level ``SparseMat::ref``,    ``SparseMat::value``     and ``SparseMat::find``     ), for example:
@@ -2020,7 +2186,7 @@ The class ``SparseMat`` represents multi-dimensional sparse numerical arrays. Su
     ..
 
 *
-    Sparse matrix iterators. They are similar to ``MatIterator`` but different from :cpp:class:`NAryMatIterator`.     That is, the iteration loop is familiar to STL users:
+    Sparse matrix iterators. They are similar to ``MatIterator`` but different from :ocv:class:`NAryMatIterator`.     That is, the iteration loop is familiar to STL users:
 
     ::
 
@@ -2080,10 +2246,10 @@ The class ``SparseMat`` represents multi-dimensional sparse numerical arrays. Su
 
 SparseMat\_
 -----------
-.. cpp:class:: SparseMat_
+.. ocv:class:: SparseMat_
 
 Template sparse n-dimensional array class derived from
-:cpp:class:`SparseMat` ::
+:ocv:class:`SparseMat` ::
 
     template<typename _Tp> class SparseMat_ : public SparseMat
     {
@@ -2133,7 +2299,7 @@ Template sparse n-dimensional array class derived from
         SparseMatConstIterator_<_Tp> end() const;
     };
     
-``SparseMat_`` is a thin wrapper on top of :cpp:class:`SparseMat`  created in the same way as ``Mat_`` .
+``SparseMat_`` is a thin wrapper on top of :ocv:class:`SparseMat`  created in the same way as ``Mat_`` .
 It simplifies notation of some operations. ::
 
     int sz[] = {10, 20, 30};
@@ -2142,3 +2308,156 @@ It simplifies notation of some operations. ::
     M.ref(1, 2, 3) = M(4, 5, 6) + M(7, 8, 9);
 
 
+Algorithm
+---------
+
+This is a base class for all more or less complex algorithms in OpenCV, especially for classes of algorithms, for which there can be multiple implementations. The examples are stereo correspondence (for which there are algorithms like block matching, semi-global block matching, graph-cut etc.), background subtraction (which can be done using mixture-of-gaussians models, codebook-based algorithm etc.), optical flow (block matching, Lucas-Kanade, Horn-Schunck etc.).
+
+The class provides the following features for all derived classes:
+
+    * so called "virtual constructor". That is, each Algorithm derivative is registered at program start and you can get the list of registered algorithms and create instance of a particular algorithm by its name (see ``Algorithm::create``). If you plan to add your own algorithms, it is good practice to add a unique prefix to your algorithms to distinguish them from other algorithms.
+    
+    * setting/retrieving algorithm parameters by name. If you used video capturing functionality from OpenCV highgui module, you are probably familar with ``cvSetCaptureProperty()``, ``cvGetCaptureProperty()``, ``VideoCapture::set()`` and ``VideoCapture::get()``. ``Algorithm`` provides similar method where instead of integer id's you specify the parameter names as text strings. See ``Algorithm::set`` and ``Algorithm::get`` for details.
+
+    * reading and writing parameters from/to XML or YAML files. Every Algorithm derivative can store all its parameters and then read them back. There is no need to re-implement it each time.
+    
+Here is example of SIFT use in your application via Algorithm interface: ::
+
+    #include "opencv2/opencv.hpp"
+    #include "opencv2/nonfree/nonfree.hpp"
+
+    ...
+
+    initModule_nonfree(); // to load SURF/SIFT etc.
+    
+    Ptr<Feature2D> sift = Algorithm::create<Feature2D>("Feature2D.SIFT");
+    
+    FileStorage fs("sift_params.xml", FileStorage::READ);
+    if( fs.isOpened() ) // if we have file with parameters, read them
+    {
+        sift->read(fs["sift_params"]);
+        fs.release();
+    }
+    else // else modify the parameters and store them; user can later edit the file to use different parameters
+    {
+        sift->set("contrastThreshold", 0.01f); // lower the contrast threshold, compared to the default value
+        
+        {
+        WriteStructContext ws(fs, "sift_params", CV_NODE_MAP);
+        sift->write(fs);
+        }
+    }
+    
+    Mat image = imread("myimage.png", 0), descriptors;
+    vector<KeyPoint> keypoints;
+    (*sift)(image, noArray(), keypoints, descriptors);
+    
+
+Algorithm::get
+--------------
+Returns the algorithm parameter
+
+.. ocv:function:: template<typename _Tp> typename ParamType<_Tp>::member_type Algorithm::get(const string& name) const
+
+    :param name: The parameter name.
+
+The method returns value of the particular parameter. Since the compiler can not deduce the type of the returned parameter, you should specify it explicitly in angle brackets. Here are the allowed forms of get:
+
+    * myalgo.get<int>("param_name")
+    * myalgo.get<double>("param_name")
+    * myalgo.get<bool>("param_name")
+    * myalgo.get<string>("param_name")
+    * myalgo.get<Mat>("param_name")
+    * myalgo.get<vector<Mat> >("param_name")
+    * myalgo.get<Algorithm>("param_name") (it returns Ptr<Algorithm>).
+
+In some cases the actual type of the parameter can be cast to the specified type, e.g. integer parameter can be cast to double, ``bool`` can be cast to ``int``. But "dangerous" transformations (string<->number, double->int, 1x1 Mat<->number, ...) are not performed and the method will throw an exception. In the case of ``Mat`` or ``vector<Mat>`` parameters the method does not clone the matrix data, so do not modify the matrices. Use ``Algorithm::set`` instead - slower, but more safe.
+
+
+Algorithm::set
+--------------
+Sets the algorithm parameter
+
+.. ocv:function:: void Algorithm::set(const string& name, int value)
+.. ocv:function:: void Algorithm::set(const string& name, double value)
+.. ocv:function:: void Algorithm::set(const string& name, bool value)
+.. ocv:function:: void Algorithm::set(const string& name, const string& value)
+.. ocv:function:: void Algorithm::set(const string& name, const Mat& value)
+.. ocv:function:: void Algorithm::set(const string& name, const vector<Mat>& value)
+.. ocv:function:: void Algorithm::set(const string& name, const Ptr<Algorithm>& value)
+
+    :param name: The parameter name.
+    :param value: The parameter value.
+
+The method sets value of the particular parameter. Some of the algorithm parameters may be declared as read-only. If you try to set such a parameter, you will get exception with the corresponding error message.
+
+
+Algorithm::write
+----------------
+Stores algorithm parameters in a file storage
+
+.. ocv:function:: void Algorithm::write(FileStorage& fs) const
+
+    :param fs: File storage.
+    
+The method stores all the algorithm parameters (in alphabetic order) to the file storage. The method is virtual. If you define your own Algorithm derivative, your can override the method and store some extra information. However, it's rarely needed. Here are some examples:
+
+ * SIFT feature detector (from nonfree module). The class only stores algorithm parameters and no keypoints or their descriptors. Therefore, it's enough to store the algorithm parameters, which is what ``Algorithm::write()`` does. Therefore, there is no dedicated ``SIFT::write()``.
+ 
+ * Background subtractor (from video module). It has the algorithm parameters and also it has the current background model. However, the background model is not stored. First, it's rather big. Then, if you have stored the background model, it would likely become irrelevant on the next run (because of shifted camera, changed background, different lighting etc.). Therefore, ``BackgroundSubtractorMOG`` and ``BackgroundSubtractorMOG2`` also rely on the standard ``Algorithm::write()`` to store just the algorithm parameters.
+ 
+ * Expectation Maximization (from ml module). The algorithm finds mixture of gaussians that approximates user data best of all. In this case the model may be re-used on the next run to test new data against the trained statistical model. So EM needs to store the model. However, since the model is described by a few parameters that are available as read-only algorithm parameters (i.e. they are available via ``EM::get()``), EM also relies on ``Algorithm::write()`` to store both EM parameters and the model (represented by read-only algorithm parameters).
+ 
+
+Algorithm::read
+---------------
+Reads algorithm parameters from a file storage
+
+.. ocv:function:: void Algorithm::read(const FileNode& fn)
+
+    :param fn: File node of the file storage.
+    
+The method reads all the algorithm parameters from the specified node of a file storage. Similarly to ``Algorithm::write()``, if you implement an algorithm that needs to read some extra data and/or re-compute some internal data, you may override the method.
+
+Algorithm::getList
+------------------
+Returns the list of registered algorithms
+
+.. ocv:function:: void Algorithm::getList(vector<string>& algorithms)
+
+    :param algorithms: The output vector of algorithm names.
+    
+This static method returns the list of registered algorithms in alphabetical order. Here is how to use it ::
+
+    vector<string> algorithms;
+    Algorithm::getList(algorithms);
+    cout << "Algorithms: " << algorithms.size() << endl;
+    for (size_t i=0; i < algorithms.size(); i++)
+        cout << algorithms[i] << endl;
+
+
+Algorithm::create
+-----------------
+Creates algorithm instance by name
+
+.. ocv:function:: template<typename _Tp> Ptr<_Tp> Algorithm::create(const string& name)
+
+    :param name: The algorithm name, one of the names returned by ``Algorithm::getList()``.
+    
+This static method creates a new instance of the specified algorithm. If there is no such algorithm, the method will silently return null pointer (that can be checked by ``Ptr::empty()`` method). Also, you should specify the particular ``Algorithm`` subclass as ``_Tp`` (or simply ``Algorithm`` if you do not know it at that point). ::
+
+    Ptr<BackgroundSubtractor> bgfg = Algorithm::create<BackgroundSubtractor>("BackgroundSubtractor.MOG2");
+    
+.. note:: This is important note about seemingly mysterious behavior of ``Algorithm::create()`` when it returns NULL while it should not. The reason is simple - ``Algorithm::create()`` resides in OpenCV`s core module and the algorithms are implemented in other modules. If you create algorithms dynamically, C++ linker may decide to throw away the modules where the actual algorithms are implemented, since you do not call any functions from the modules. To avoid this problem, you need to call ``initModule_<modulename>();`` somewhere in the beginning of the program before ``Algorithm::create()``. For example, call ``initModule_nonfree()`` in order to use SURF/SIFT, call ``initModule_ml()`` to use expectation maximization etc.
+    
+Creating Own Algorithms
+-----------------------
+
+The above methods are usually enough for users. If you want to make your own algorithm, derived from ``Algorithm``, you should basically follow a few conventions and add a little semi-standard piece of code to your class:
+
+ * Make a class and specify ``Algorithm`` as its base class.
+ * The algorithm parameters should be the class members. See ``Algorithm::get()`` for the list of possible types of the parameters.
+ * Add public virtual method ``AlgorithmInfo* info() const;`` to your class.
+ * Add constructor function, ``AlgorithmInfo`` instance and implement the ``info()`` method. The simplest way is to take  http://code.opencv.org/svn/opencv/trunk/opencv/modules/ml/src/ml_init.cpp as the reference and modify it according to the list of your parameters.
+ * Add some public function (e.g. ``initModule_<mymodule>()``) that calls info() of your algorithm and put it into the same source file as ``info()`` implementation. This is to force C++ linker to include this object file into the target application. See ``Algorithm::create()`` for details.
+ 

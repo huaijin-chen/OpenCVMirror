@@ -1,5 +1,5 @@
 #!/usr/bin/python
-import cv
+import cv2.cv as cv
 
 class PyrSegmentation:
     def __init__(self, img0):
@@ -38,3 +38,4 @@ if __name__ == "__main__":
 
     # segmentation of the color image
     PyrSegmentation(img0).run()
+    cv.DestroyAllWindows()

@@ -44,6 +44,15 @@
 
 using namespace cv;
 
+namespace cv {
+// TODO: conflicts with calib3d.hpp : filterSpeckles, should be removed ?
+
+//! Speckle filtering - filters small connected components on diparity image.
+//! It sets pixel (x,y) to newVal if it coresponds to small CC with size < maxSpeckleSize.
+//! Threshold for border between CC is diffThreshold;
+  CV_EXPORTS void filterSpeckles(Mat& img, uchar newVal, int maxSpeckleSize, uchar diffThreshold, Mat& buf);
+}
+
 typedef Point_<short> Point2s;
 
 void cv::filterSpeckles( Mat& img, uchar newVal, int maxSpeckleSize, uchar maxDiff, Mat& _buf)
@@ -64,10 +73,10 @@ void cv::filterSpeckles( Mat& img, uchar newVal, int maxSpeckleSize, uchar maxDi
     int width = img.cols, height = img.rows, npixels = width*height;
     size_t bufSize = npixels*(int)(sizeof(Point2s) + sizeof(int) + sizeof(uchar));
     if( !_buf.isContinuous() || !_buf.data || _buf.cols*_buf.rows*_buf.elemSize() < bufSize )
-        _buf.create(1, bufSize, CV_8U);
+        _buf.create(1, (int)bufSize, CV_8U);
 
     uchar* buf = _buf.data;
-    int i, j, dstep = img.step/sizeof(uchar);
+    int i, j, dstep = (int)(img.step/sizeof(uchar));
     int* labels = (int*)buf;
     buf += npixels*sizeof(labels[0]);
     Point2s* wbuf = (Point2s*)buf;

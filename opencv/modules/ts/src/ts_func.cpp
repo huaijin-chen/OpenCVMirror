@@ -177,11 +177,12 @@ void add(const Mat& _a, double alpha, const Mat& _b, double beta,
     Mat planes[3], buf[3];
     
     NAryMatIterator it(arrays, planes);
-    int i, nplanes = it.nplanes, cn=a.channels();
-    size_t total = planes[0].total(), maxsize = std::min((size_t)12*12*std::max(12/cn, 1), total);
+    size_t i, nplanes = it.nplanes;
+	int cn=a.channels();
+    int total = (int)planes[0].total(), maxsize = std::min(12*12*std::max(12/cn, 1), total);
     
     CV_Assert(planes[0].rows == 1);
-    buf[0].create(1, (int)maxsize, CV_64FC(cn));
+    buf[0].create(1, maxsize, CV_64FC(cn));
     if(!b.empty())
         buf[1].create(1, maxsize, CV_64FC(cn));
     buf[2].create(1, maxsize, CV_64FC(cn));
@@ -189,12 +190,12 @@ void add(const Mat& _a, double alpha, const Mat& _b, double beta,
     
     for( i = 0; i < nplanes; i++, ++it)
     {
-        for( size_t j = 0; j < total; j += maxsize )
+        for( int j = 0; j < total; j += maxsize )
         {
-            size_t j2 = std::min(j + maxsize, total);
-            Mat apart0 = planes[0].colRange((int)j, (int)j2);
-            Mat cpart0 = planes[2].colRange((int)j, (int)j2);
-            Mat apart = buf[0].colRange(0, (int)(j2 - j));
+            int j2 = std::min(j + maxsize, total);
+            Mat apart0 = planes[0].colRange(j, j2);
+            Mat cpart0 = planes[2].colRange(j, j2);
+            Mat apart = buf[0].colRange(0, j2 - j);
             
             apart0.convertTo(apart, apart.type(), alpha);
             size_t k, n = (j2 - j)*cn;
@@ -291,7 +292,7 @@ void convert(const Mat& src, Mat& dst, int dtype, double alpha, double beta)
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total()*planes[0].channels();
-    int i, nplanes = it.nplanes;
+    size_t i, nplanes = it.nplanes;
     
     for( i = 0; i < nplanes; i++, ++it)
     {
@@ -335,7 +336,7 @@ void copy(const Mat& src, Mat& dst, const Mat& mask, bool invertMask)
         const Mat* arrays[] = {&src, &dst, 0};
         Mat planes[2];
         NAryMatIterator it(arrays, planes);
-        int i, nplanes = it.nplanes;
+        size_t i, nplanes = it.nplanes;
         size_t planeSize = planes[0].total()*src.elemSize();
         
         for( i = 0; i < nplanes; i++, ++it )
@@ -351,7 +352,7 @@ void copy(const Mat& src, Mat& dst, const Mat& mask, bool invertMask)
     
     NAryMatIterator it(arrays, planes);
     size_t j, k, elemSize = src.elemSize(), total = planes[0].total();
-    int i, nplanes = it.nplanes;
+    size_t i, nplanes = it.nplanes;
     
     for( i = 0; i < nplanes; i++, ++it)
     {
@@ -380,7 +381,7 @@ void set(Mat& dst, const Scalar& gamma, const Mat& mask)
         const Mat* arrays[] = {&dst, 0};
         Mat plane;
         NAryMatIterator it(arrays, &plane);
-        int i, nplanes = it.nplanes;
+        size_t i, nplanes = it.nplanes;
         size_t j, k, elemSize = dst.elemSize(), planeSize = plane.total()*elemSize;
         
         for( k = 1; k < elemSize; k++ )
@@ -412,7 +413,7 @@ void set(Mat& dst, const Scalar& gamma, const Mat& mask)
     
     NAryMatIterator it(arrays, planes);
     size_t j, k, elemSize = dst.elemSize(), total = planes[0].total();
-    int i, nplanes = it.nplanes;
+    size_t i, nplanes = it.nplanes;
     
     for( i = 0; i < nplanes; i++, ++it)
     {
@@ -437,7 +438,7 @@ void insert(const Mat& src, Mat& dst, int coi)
     const Mat* arrays[] = {&src, &dst, 0};
     Mat planes[2];
     NAryMatIterator it(arrays, planes);
-    int i, nplanes = it.nplanes;
+    size_t i, nplanes = it.nplanes;
     size_t j, k, size0 = src.elemSize(), size1 = dst.elemSize(), total = planes[0].total();
     
     for( i = 0; i < nplanes; i++, ++it )
@@ -462,7 +463,7 @@ void extract(const Mat& src, Mat& dst, int coi)
     const Mat* arrays[] = {&src, &dst, 0};
     Mat planes[2];
     NAryMatIterator it(arrays, planes);
-    int i, nplanes = it.nplanes;
+    size_t i, nplanes = it.nplanes;
     size_t j, k, size0 = src.elemSize(), size1 = dst.elemSize(), total = planes[0].total();
     
     for( i = 0; i < nplanes; i++, ++it )
@@ -546,7 +547,8 @@ void randUni( RNG& rng, Mat& a, const Scalar& param0, const Scalar& param1 )
     Mat plane;
     
     NAryMatIterator it(arrays, &plane);
-    int i, nplanes = it.nplanes, depth = a.depth(), cn = a.channels();
+    size_t i, nplanes = it.nplanes;
+	int depth = a.depth(), cn = a.channels();
     size_t total = plane.total()*cn;
     
     for( i = 0; i < nplanes; i++, ++it )
@@ -1017,7 +1019,7 @@ static void setpos( const Mat& mtx, vector<int>& pos, size_t idx )
         for( int i = mtx.dims-1; i >= 0; i-- )
         {
             int sz = mtx.size[i]*(i == mtx.dims-1 ? mtx.channels() : 1);
-            pos[i] = idx % sz;
+            pos[i] = (int)(idx % sz);
             idx /= sz;
         }
     }
@@ -1038,7 +1040,8 @@ void minMaxLoc(const Mat& src, double* _minval, double* _maxval,
     
     NAryMatIterator it(arrays, planes);
     size_t startidx = 1, total = planes[0].total();
-    int i, nplanes = it.nplanes, depth = src.depth();
+    size_t i, nplanes = it.nplanes;
+	int depth = src.depth();
     double maxval = depth < CV_32F ? INT_MIN : depth == CV_32F ? -FLT_MAX : -DBL_MAX;
     double minval = depth < CV_32F ? INT_MAX : depth == CV_32F ? FLT_MAX : DBL_MAX;
     size_t maxidx = 0, minidx = 0;
@@ -1096,6 +1099,23 @@ void minMaxLoc(const Mat& src, double* _minval, double* _maxval,
         setpos( src, *_minloc, minidx );
 }
 
+    
+static int
+normHamming(const uchar* src, size_t total, int cellSize)
+{
+    int result = 0;
+    int mask = cellSize == 1 ? 1 : cellSize == 2 ? 3 : cellSize == 4 ? 15 : -1;
+    CV_Assert( mask >= 0 );
+    
+    for( size_t i = 0; i < total; i++ )
+    {
+        unsigned a = src[i];
+        for( ; a != 0; a >>= cellSize )
+            result += (a & mask) != 0;
+    }
+    return result;
+}
+    
     
 template<typename _Tp> static double
 norm_(const _Tp* src, size_t total, int cn, int normType, double startval, const uchar* mask)
@@ -1213,15 +1233,43 @@ norm_(const _Tp* src1, const _Tp* src2, size_t total, int cn, int normType, doub
     
 double norm(const Mat& src, int normType, const Mat& mask)
 {
+    if( normType == NORM_HAMMING || normType == NORM_HAMMING2 )
+    {
+        if( !mask.empty() )
+        {
+            Mat temp;
+            bitwise_and(src, mask, temp);
+            return norm(temp, normType, Mat());
+        }
+        
+        CV_Assert( src.depth() == CV_8U );
+        
+        const Mat *arrays[]={&src, 0};
+        Mat planes[1];
+        
+        NAryMatIterator it(arrays, planes);
+        size_t total = planes[0].total();
+        size_t i, nplanes = it.nplanes;
+        double result = 0;
+        int cellSize = normType == NORM_HAMMING ? 1 : 2;
+        
+        for( i = 0; i < nplanes; i++, ++it )
+            result += normHamming(planes[0].data, total, cellSize);
+        return result;
+    }
+    int normType0 = normType;
+    normType = normType == NORM_L2SQR ? NORM_L2 : normType;
+    
     CV_Assert( mask.empty() || (src.size == mask.size && mask.type() == CV_8U) );
     CV_Assert( normType == NORM_INF || normType == NORM_L1 || normType == NORM_L2 );
+    
     const Mat *arrays[]={&src, &mask, 0};
     Mat planes[2];
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total();
-    int i, nplanes = it.nplanes, depth = src.depth();
-    int cn = planes[0].channels();
+    size_t i, nplanes = it.nplanes;
+    int depth = src.depth(), cn = planes[0].channels();
     double result = 0;
     
     for( i = 0; i < nplanes; i++, ++it )
@@ -1256,7 +1304,7 @@ double norm(const Mat& src, int normType, const Mat& mask)
             CV_Error(CV_StsUnsupportedFormat, "");
         };
     }
-    if( normType == NORM_L2 )
+    if( normType0 == NORM_L2 )
         result = sqrt(result);
     return result;
 }
@@ -1264,6 +1312,31 @@ double norm(const Mat& src, int normType, const Mat& mask)
     
 double norm(const Mat& src1, const Mat& src2, int normType, const Mat& mask)
 {
+    if( normType == NORM_HAMMING || normType == NORM_HAMMING2 )
+    {
+        Mat temp;
+        bitwise_xor(src1, src2, temp);
+        if( !mask.empty() )
+            bitwise_and(temp, mask, temp);
+        
+        CV_Assert( temp.depth() == CV_8U );
+        
+        const Mat *arrays[]={&temp, 0};
+        Mat planes[1];
+        
+        NAryMatIterator it(arrays, planes);
+        size_t total = planes[0].total();
+        size_t i, nplanes = it.nplanes;
+        double result = 0;
+        int cellSize = normType == NORM_HAMMING ? 1 : 2;
+        
+        for( i = 0; i < nplanes; i++, ++it )
+            result += normHamming(planes[0].data, total, cellSize);
+        return result;
+    }
+    int normType0 = normType;
+    normType = normType == NORM_L2SQR ? NORM_L2 : normType;
+    
     CV_Assert( src1.type() == src2.type() && src1.size == src2.size );
     CV_Assert( mask.empty() || (src1.size == mask.size && mask.type() == CV_8U) );
     CV_Assert( normType == NORM_INF || normType == NORM_L1 || normType == NORM_L2 );
@@ -1272,8 +1345,8 @@ double norm(const Mat& src1, const Mat& src2, int normType, const Mat& mask)
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total();
-    int i, nplanes = it.nplanes, depth = src1.depth();
-    int cn = planes[0].channels();
+    size_t i, nplanes = it.nplanes;
+	int depth = src1.depth(), cn = planes[0].channels();
     double result = 0;
     
     for( i = 0; i < nplanes; i++, ++it )
@@ -1309,7 +1382,7 @@ double norm(const Mat& src1, const Mat& src2, int normType, const Mat& mask)
             CV_Error(CV_StsUnsupportedFormat, "");
         };
     }
-    if( normType == NORM_L2 )
+    if( normType0 == NORM_L2 )
         result = sqrt(result);
     return result;
 }
@@ -1332,7 +1405,8 @@ double crossCorr(const Mat& src1, const Mat& src2)
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total()*planes[0].channels();
-    int i, nplanes = it.nplanes, depth = src1.depth();
+    size_t i, nplanes = it.nplanes;
+	int depth = src1.depth();
     double result = 0;
     
     for( i = 0; i < nplanes; i++, ++it )
@@ -1394,14 +1468,14 @@ logicOpS_(const uchar* src, const uchar* scalar, uchar* dst, size_t total, char 
     if( c == '&' )
         for( i = 0; i < total; i += blockSize, dst += blockSize, src += blockSize )
         {
-            size_t sz = std::min(total - i, blockSize);
+            size_t sz = MIN(total - i, blockSize);
             for( j = 0; j < sz; j++ )
                 dst[j] = src[j] & scalar[j];
         }
     else if( c == '|' )
         for( i = 0; i < total; i += blockSize, dst += blockSize, src += blockSize )
         {
-            size_t sz = std::min(total - i, blockSize);
+            size_t sz = MIN(total - i, blockSize);
             for( j = 0; j < sz; j++ )
                 dst[j] = src[j] | scalar[j];
         }
@@ -1409,7 +1483,7 @@ logicOpS_(const uchar* src, const uchar* scalar, uchar* dst, size_t total, char 
     {
         for( i = 0; i < total; i += blockSize, dst += blockSize, src += blockSize )
         {
-            size_t sz = std::min(total - i, blockSize);
+            size_t sz = MIN(total - i, blockSize);
             for( j = 0; j < sz; j++ )
                 dst[j] = src[j] ^ scalar[j];
         }
@@ -1430,7 +1504,7 @@ void logicOp( const Mat& src1, const Mat& src2, Mat& dst, char op )
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total()*planes[0].elemSize();
-    int i, nplanes = it.nplanes;
+    size_t i, nplanes = it.nplanes;
     
     for( i = 0; i < nplanes; i++, ++it )
     {
@@ -1452,9 +1526,9 @@ void logicOp(const Mat& src, const Scalar& s, Mat& dst, char op)
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total()*planes[0].elemSize();
-    int i, nplanes = it.nplanes;
+    size_t i, nplanes = it.nplanes;
     double buf[12];
-    scalarToRawData(s, buf, src.type(), 96/planes[0].elemSize1());
+    scalarToRawData(s, buf, src.type(), (int)(96/planes[0].elemSize1()));
     
     for( i = 0; i < nplanes; i++, ++it )
     {
@@ -1547,7 +1621,8 @@ void compare(const Mat& src1, const Mat& src2, Mat& dst, int cmpop)
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total();
-    int i, nplanes = it.nplanes, depth = src1.depth();
+    size_t i, nplanes = it.nplanes;
+	int depth = src1.depth();
     
     for( i = 0; i < nplanes; i++, ++it )
     {
@@ -1593,7 +1668,8 @@ void compare(const Mat& src, double value, Mat& dst, int cmpop)
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total();
-    int i, nplanes = it.nplanes, depth = src.depth();
+    size_t i, nplanes = it.nplanes;
+	int depth = src.depth();
     int ivalue = saturate_cast<int>(value);
     
     for( i = 0; i < nplanes; i++, ++it )
@@ -1721,7 +1797,8 @@ bool cmpUlps(const Mat& src1, const Mat& src2, int imaxDiff, double* _realmaxdif
     Mat planes[2];
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total()*planes[0].channels();
-    int i, nplanes = it.nplanes, depth = src1.depth();
+    size_t i, nplanes = it.nplanes;
+	int depth = src1.depth();
     size_t startidx = 1, idx = 0;
     if(_realmaxdiff)
         *_realmaxdiff = 0;
@@ -1806,7 +1883,8 @@ int check( const Mat& a, double fmin, double fmax, vector<int>* _idx )
     Mat plane;
     NAryMatIterator it(arrays, &plane);
     size_t total = plane.total()*plane.channels();
-    int i, nplanes = it.nplanes, depth = a.depth();
+    size_t i, nplanes = it.nplanes;
+	int depth = a.depth();
     size_t startidx = 1, idx = 0;
     int imin = 0, imax = 0;
     
@@ -1874,7 +1952,8 @@ int cmpEps( const Mat& arr, const Mat& refarr, double* _realmaxdiff,
     Mat planes[2];
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total()*planes[0].channels(), j = total;
-    int i, nplanes = it.nplanes, depth = arr.depth();
+    size_t i, nplanes = it.nplanes;
+	int depth = arr.depth();
     size_t startidx = 1, idx = 0;
     double realmaxdiff = 0, maxval = 0;
     
@@ -2160,11 +2239,11 @@ void gemm( const Mat& _a, const Mat& _b, double alpha,
     if( a.depth() == CV_32F )
         GEMM_(a.ptr<float>(), a_step, a_delta, b.ptr<float>(), b_step, b_delta,
               !c.empty() ? c.ptr<float>() : 0, c_step, c_delta, d.ptr<float>(),
-              d.step1(), a_rows, b_cols, a_cols, cn, alpha, beta );
+              (int)d.step1(), a_rows, b_cols, a_cols, cn, alpha, beta );
     else
         GEMM_(a.ptr<double>(), a_step, a_delta, b.ptr<double>(), b_step, b_delta,
               !c.empty() ? c.ptr<double>() : 0, c_step, c_delta, d.ptr<double>(),
-              d.step1(), a_rows, b_cols, a_cols, cn, alpha, beta );
+              (int)d.step1(), a_rows, b_cols, a_cols, cn, alpha, beta );
 }
 
 
@@ -2282,7 +2361,7 @@ void transform( const Mat& src, Mat& dst, const Mat& transmat, const Mat& _shift
     Mat planes[2];
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total();
-    int i, nplanes = it.nplanes;
+    size_t i, nplanes = it.nplanes;
     
     for( i = 0; i < nplanes; i++, ++it )
     {
@@ -2338,7 +2417,7 @@ static void minmax(const Mat& src1, const Mat& src2, Mat& dst, char op)
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total()*planes[0].channels();
-    int i, nplanes = it.nplanes, depth = src1.depth();
+    size_t i, nplanes = it.nplanes, depth = src1.depth();
     
     for( i = 0; i < nplanes; i++, ++it )
     {
@@ -2406,7 +2485,7 @@ static void minmax(const Mat& src1, double val, Mat& dst, char op)
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total()*planes[0].channels();
-    int i, nplanes = it.nplanes, depth = src1.depth();
+    size_t i, nplanes = it.nplanes, depth = src1.depth();
     int ival = saturate_cast<int>(val);
     
     for( i = 0; i < nplanes; i++, ++it )
@@ -2478,7 +2557,7 @@ static void muldiv(const Mat& src1, const Mat& src2, Mat& dst, double scale, cha
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[1].total()*planes[1].channels();
-    int i, nplanes = it.nplanes, depth = src2.depth();
+    size_t i, nplanes = it.nplanes, depth = src2.depth();
     
     for( i = 0; i < nplanes; i++, ++it )
     {
@@ -2563,7 +2642,8 @@ Scalar mean(const Mat& src, const Mat& mask)
     
     NAryMatIterator it(arrays, planes);
     size_t total = planes[0].total();
-    int i, nplanes = it.nplanes, depth = src.depth(), cn = src.channels();
+    size_t i, nplanes = it.nplanes;
+    int depth = src.depth(), cn = src.channels();
     
     for( i = 0; i < nplanes; i++, ++it )
     {

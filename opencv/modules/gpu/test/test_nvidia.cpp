@@ -39,36 +39,132 @@
 //
 //M*/
 
-#include "test_precomp.hpp"
-#include "cvconfig.h"
+#include "precomp.hpp"
 
-class CV_NVidiaTestsCaller : public cvtest::BaseTest
+#ifdef HAVE_CUDA
+
+using namespace cvtest;
+using namespace testing;
+
+enum OutputLevel
 {
-public:
-    CV_NVidiaTestsCaller() {}
-    virtual ~CV_NVidiaTestsCaller() {}
-
-protected:
-    
-	void run( int )
-	{   
-		;
-
-#if defined(HAVE_CUDA)
-		bool main_nvidia(const std::string&);
-
-		// Invoke all NVIDIA Staging tests and obtain the result
-		bool passed = main_nvidia(std::string(ts->get_data_path()) + "haarcascade/");
-
-		if (passed)
-		    ts->set_failed_test_info(cvtest::TS::OK);
-		else
-		    ts->set_failed_test_info(cvtest::TS::FAIL_INVALID_OUTPUT);
-
-#else
-		ts->set_failed_test_info(cvtest::TS::SKIPPED);
-#endif
-	}   
+    OutputLevelNone,
+    OutputLevelCompact,
+    OutputLevelFull
 };
 
-TEST(NVidia, multitest) { CV_NVidiaTestsCaller test; test.safe_run(); }
+bool nvidia_NPPST_Integral_Image(const std::string& test_data_path, OutputLevel outputLevel);
+bool nvidia_NPPST_Squared_Integral_Image(const std::string& test_data_path, OutputLevel outputLevel);
+bool nvidia_NPPST_RectStdDev(const std::string& test_data_path, OutputLevel outputLevel);
+bool nvidia_NPPST_Resize(const std::string& test_data_path, OutputLevel outputLevel);
+bool nvidia_NPPST_Vector_Operations(const std::string& test_data_path, OutputLevel outputLevel);
+bool nvidia_NPPST_Transpose(const std::string& test_data_path, OutputLevel outputLevel);
+bool nvidia_NCV_Vector_Operations(const std::string& test_data_path, OutputLevel outputLevel);
+bool nvidia_NCV_Haar_Cascade_Loader(const std::string& test_data_path, OutputLevel outputLevel);
+bool nvidia_NCV_Haar_Cascade_Application(const std::string& test_data_path, OutputLevel outputLevel);
+bool nvidia_NCV_Hypotheses_Filtration(const std::string& test_data_path, OutputLevel outputLevel);
+bool nvidia_NCV_Visualization(const std::string& test_data_path, OutputLevel outputLevel);
+
+struct NVidiaTest : TestWithParam<cv::gpu::DeviceInfo>
+{
+    cv::gpu::DeviceInfo devInfo;
+
+    std::string path;
+
+    virtual void SetUp()
+    {
+        devInfo = GetParam();
+
+        cv::gpu::setDevice(devInfo.deviceID());
+
+        path = std::string(TS::ptr()->get_data_path()) + "haarcascade/";
+    }
+};
+
+struct NPPST : NVidiaTest {};
+struct NCV : NVidiaTest {};
+
+OutputLevel nvidiaTestOutputLevel = OutputLevelCompact;
+
+TEST_P(NPPST, Integral)
+{
+    bool res = nvidia_NPPST_Integral_Image(path, nvidiaTestOutputLevel);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_P(NPPST, SquaredIntegral)
+{
+    bool res = nvidia_NPPST_Squared_Integral_Image(path, nvidiaTestOutputLevel);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_P(NPPST, RectStdDev)
+{
+    bool res = nvidia_NPPST_RectStdDev(path, nvidiaTestOutputLevel);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_P(NPPST, Resize)
+{
+    bool res = nvidia_NPPST_Resize(path, nvidiaTestOutputLevel);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_P(NPPST, VectorOperations)
+{
+    bool res = nvidia_NPPST_Vector_Operations(path, nvidiaTestOutputLevel);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_P(NPPST, Transpose)
+{
+    bool res = nvidia_NPPST_Transpose(path, nvidiaTestOutputLevel);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_P(NCV, VectorOperations)
+{
+    bool res = nvidia_NCV_Vector_Operations(path, nvidiaTestOutputLevel);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_P(NCV, HaarCascadeLoader)
+{
+    bool res = nvidia_NCV_Haar_Cascade_Loader(path, nvidiaTestOutputLevel);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_P(NCV, HaarCascadeApplication)
+{
+    bool res = nvidia_NCV_Haar_Cascade_Application(path, nvidiaTestOutputLevel);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_P(NCV, HypothesesFiltration)
+{
+    bool res = nvidia_NCV_Hypotheses_Filtration(path, nvidiaTestOutputLevel);
+
+    ASSERT_TRUE(res);
+}
+
+TEST_P(NCV, Visualization)
+{
+    // this functionality doesn't used in gpu module
+    bool res = nvidia_NCV_Visualization(path, nvidiaTestOutputLevel);
+
+    ASSERT_TRUE(res);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_NVidia, NPPST, ALL_DEVICES);
+INSTANTIATE_TEST_CASE_P(GPU_NVidia, NCV, ALL_DEVICES);
+
+#endif // HAVE_CUDA

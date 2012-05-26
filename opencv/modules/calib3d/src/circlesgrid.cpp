@@ -44,65 +44,94 @@
 //#define DEBUG_CIRCLES
 
 #ifdef DEBUG_CIRCLES
-#include "opencv2/highgui/highgui.hpp"
+#  include "opencv2/opencv_modules.hpp"
+#  ifdef HAVE_OPENCV_HIGHGUI
+#    include "opencv2/highgui/highgui.hpp"
+#  else
+#    undef DEBUG_CIRCLES
+#  endif
 #endif
 
 using namespace cv;
 using namespace std;
 
+#ifdef DEBUG_CIRCLES
+void drawPoints(const vector<Point2f> &points, Mat &outImage, int radius = 2,  Scalar color = Scalar::all(255), int thickness = -1)
+{
+  for(size_t i=0; i<points.size(); i++)
+  {
+    circle(outImage, points[i], radius, color, thickness);
+  }
+}
+#endif
+
 void CirclesGridClusterFinder::hierarchicalClustering(const vector<Point2f> points, const Size &patternSize, vector<Point2f> &patternPoints)
 {
-  Mat dists(points.size(), points.size(), CV_32FC1, Scalar(0));
-  Mat distsMask(dists.size(), CV_8UC1, Scalar(0));
-  for(size_t i=0; i<points.size(); i++)
-  {
-    for(size_t j=i+1; j<points.size(); j++)
+#ifdef HAVE_TEGRA_OPTIMIZATION
+    if(tegra::hierarchicalClustering(points, patternSize, patternPoints))
+        return;
+#endif
+    int i, j, n = (int)points.size();
+    size_t pn = static_cast<size_t>(patternSize.area());
+
+    patternPoints.clear();
+    if (pn >= points.size())
     {
-      dists.at<float>(i, j) = (float)norm(points[i] - points[j]);
-      distsMask.at<uchar>(i, j) = 255;
-      //TODO: use symmetry
-      distsMask.at<uchar>(j, i) = distsMask.at<uchar>(i, j);
-      dists.at<float>(j, i) = dists.at<float>(i, j);
+        if (pn == points.size())
+            patternPoints = points;
+        return;
     }
-  }
 
-  vector<std::list<size_t> > clusters(points.size());
-  for(size_t i=0; i<points.size(); i++)
-  {
-    clusters[i].push_back(i);
-  }
+    Mat dists(n, n, CV_32FC1, Scalar(0));
+    Mat distsMask(dists.size(), CV_8UC1, Scalar(0));
+    for(i = 0; i < n; i++)
+    {
+        for(j = i+1; j < n; j++)
+        {
+            dists.at<float>(i, j) = (float)norm(points[i] - points[j]);
+            distsMask.at<uchar>(i, j) = 255;
+            //TODO: use symmetry
+            distsMask.at<uchar>(j, i) = 255;//distsMask.at<uchar>(i, j);
+            dists.at<float>(j, i) = dists.at<float>(i, j);
+        }
+    }
 
-  int patternClusterIdx = 0;
-  while(clusters[patternClusterIdx].size() < static_cast<size_t>(patternSize.area()) && countNonZero(distsMask == 255) > 0)
-  {
-    Point minLoc;
-    minMaxLoc(dists, 0, 0, &minLoc, 0, distsMask);
-    int minIdx = std::min(minLoc.x, minLoc.y);
-    int maxIdx = std::max(minLoc.x, minLoc.y);
+    vector<std::list<size_t> > clusters(points.size());
+    for(size_t i=0; i<points.size(); i++)
+    {
+        clusters[i].push_back(i);
+    }
 
-    distsMask.row(maxIdx).setTo(0);
-    distsMask.col(maxIdx).setTo(0);
-    Mat newDists = cv::min(dists.row(minLoc.x), dists.row(minLoc.y));
-    Mat tmpLine = dists.row(minIdx);
-    newDists.copyTo(tmpLine);
-    tmpLine = dists.col(minIdx);
-    newDists.copyTo(tmpLine);
+    int patternClusterIdx = 0;
+    while(clusters[patternClusterIdx].size() < pn)
+    {
+        Point minLoc;
+        minMaxLoc(dists, 0, 0, &minLoc, 0, distsMask);
+        int minIdx = std::min(minLoc.x, minLoc.y);
+        int maxIdx = std::max(minLoc.x, minLoc.y);
 
-    clusters[minIdx].splice(clusters[minIdx].end(), clusters[maxIdx]);
-    patternClusterIdx = minIdx;
-  }
+        distsMask.row(maxIdx).setTo(0);
+        distsMask.col(maxIdx).setTo(0);
+        Mat tmpRow = dists.row(minIdx);
+        Mat tmpCol = dists.col(minIdx);
+        cv::min(dists.row(minLoc.x), dists.row(minLoc.y), tmpRow);
+        tmpRow.copyTo(tmpCol);
 
-  patternPoints.clear();
+        clusters[minIdx].splice(clusters[minIdx].end(), clusters[maxIdx]);
+        patternClusterIdx = minIdx;
+    }
 
-  if(clusters[patternClusterIdx].size() != static_cast<size_t>(patternSize.area()))
-  {
-    return;
-  }
-  patternPoints.reserve(clusters[patternClusterIdx].size());
-  for(std::list<size_t>::iterator it = clusters[patternClusterIdx].begin(); it != clusters[patternClusterIdx].end(); it++)
-  {
-    patternPoints.push_back(points[*it]);
-  }
+    //the largest cluster can have more than pn points -- we need to filter out such situations
+    if(clusters[patternClusterIdx].size() != static_cast<size_t>(patternSize.area()))
+    {
+      return;
+    }
+
+    patternPoints.reserve(clusters[patternClusterIdx].size());
+    for(std::list<size_t>::iterator it = clusters[patternClusterIdx].begin(); it != clusters[patternClusterIdx].end(); it++)
+    {
+        patternPoints.push_back(points[*it]);
+    }
 }
 
 void CirclesGridClusterFinder::findGrid(const std::vector<cv::Point2f> points, cv::Size _patternSize, vector<Point2f>& centers)
@@ -120,6 +149,12 @@ void CirclesGridClusterFinder::findGrid(const std::vector<cv::Point2f> points, c
   {
     return;
   }
+
+#ifdef DEBUG_CIRCLES
+  Mat patternPointsImage(1024, 1248, CV_8UC1, Scalar(0));
+  drawPoints(patternPoints, patternPointsImage);
+  imshow("pattern points", patternPointsImage);
+#endif
 
   vector<Point2f> hull2f;
   convexHull(Mat(patternPoints), hull2f, false);
@@ -170,59 +205,90 @@ void CirclesGridClusterFinder::findCorners(const std::vector<cv::Point2f> &hull2
   Mat sortedIndices;
   sortIdx(anglesMat, sortedIndices, CV_SORT_EVERY_COLUMN + CV_SORT_DESCENDING);
   CV_Assert(sortedIndices.type() == CV_32SC1);
+  CV_Assert(sortedIndices.cols == 1);
   const int cornersCount = isAsymmetricGrid ? 6 : 4;
+  Mat cornersIndices;
+  cv::sort(sortedIndices.rowRange(0, cornersCount), cornersIndices, CV_SORT_EVERY_COLUMN + CV_SORT_ASCENDING);
   corners.clear();
   for(int i=0; i<cornersCount; i++)
   {
-    corners.push_back(hull2f[sortedIndices.at<int>(i, 0)]);
+    corners.push_back(hull2f[cornersIndices.at<int>(i, 0)]);
   }
 }
 
 void CirclesGridClusterFinder::findOutsideCorners(const std::vector<cv::Point2f> &corners, std::vector<cv::Point2f> &outsideCorners)
 {
+  outsideCorners.clear();
   //find two pairs of the most nearest corners
-  double min1 = std::numeric_limits<double>::max();
-  double min2 = std::numeric_limits<double>::max();
-  Point minLoc1, minLoc2;
+  int i, j, n = (int)corners.size();
 
-  for(size_t i=0; i<corners.size(); i++)
+#ifdef DEBUG_CIRCLES
+  Mat cornersImage(1024, 1248, CV_8UC1, Scalar(0));
+  drawPoints(corners, cornersImage);
+  imshow("corners", cornersImage);
+#endif
+
+  vector<Point2f> tangentVectors(corners.size());
+  for(size_t k=0; k<corners.size(); k++)
   {
-    for(size_t j=i+1; j<corners.size(); j++)
+    Point2f diff = corners[(k + 1) % corners.size()] - corners[k];
+    tangentVectors[k] = diff * (1.0f / norm(diff));
+  }
+
+  //compute angles between all sides
+  Mat cosAngles(n, n, CV_32FC1, 0.0f);
+  for(i = 0; i < n; i++)
+  {
+    for(j = i + 1; j < n; j++)
     {
-      double dist = norm(corners[i] - corners[j]);
-      Point loc(j, i);
-      if(dist < min1)
-      {
-        min2 = min1;
-        minLoc2 = minLoc1;
-        min1 = dist;
-        minLoc1 = loc;
-      }
-      else
-      {
-        if(dist < min2)
-        {
-          min2 = dist;
-          minLoc2 = loc;
-        }
-      }
+      float val = fabs(tangentVectors[i].dot(tangentVectors[j]));
+      cosAngles.at<float>(i, j) = val;
+      cosAngles.at<float>(j, i) = val;
     }
   }
-  std::set<int> outsideCornersIndices;
-  for(size_t i=0; i<corners.size(); i++)
-  {
-    outsideCornersIndices.insert(i);
-  }
-  outsideCornersIndices.erase(minLoc1.x);
-  outsideCornersIndices.erase(minLoc1.y);
-  outsideCornersIndices.erase(minLoc2.x);
-  outsideCornersIndices.erase(minLoc2.y);
 
-  outsideCorners.clear();
-  for(std::set<int>::iterator it = outsideCornersIndices.begin(); it != outsideCornersIndices.end(); it++)
+  //find two parallel sides to which outside corners belong
+  Point maxLoc;
+  minMaxLoc(cosAngles, 0, 0, 0, &maxLoc);
+  const int diffBetweenFalseLines = 3;
+  if(abs(maxLoc.x - maxLoc.y) == diffBetweenFalseLines)
   {
-    outsideCorners.push_back(corners[*it]);
+    cosAngles.row(maxLoc.x).setTo(0.0f);
+    cosAngles.col(maxLoc.x).setTo(0.0f);
+    cosAngles.row(maxLoc.y).setTo(0.0f);
+    cosAngles.col(maxLoc.y).setTo(0.0f);
+    minMaxLoc(cosAngles, 0, 0, 0, &maxLoc);
   }
+
+#ifdef DEBUG_CIRCLES
+  Mat linesImage(1024, 1248, CV_8UC1, Scalar(0));
+  line(linesImage, corners[maxLoc.y], corners[(maxLoc.y + 1) % n], Scalar(255));
+  line(linesImage, corners[maxLoc.x], corners[(maxLoc.x + 1) % n], Scalar(255));
+  imshow("lines", linesImage);
+#endif
+
+  int maxIdx = std::max(maxLoc.x, maxLoc.y);
+  int minIdx = std::min(maxLoc.x, maxLoc.y);
+  const int bigDiff = 4;
+  if(maxIdx - minIdx == bigDiff)
+  {
+    minIdx += n;
+    std::swap(maxIdx, minIdx);
+  }
+  if(maxIdx - minIdx != n - bigDiff)
+  {
+    return;
+  }
+
+  int outsidersSegmentIdx = (minIdx + maxIdx) / 2;
+
+  outsideCorners.push_back(corners[outsidersSegmentIdx % n]);
+  outsideCorners.push_back(corners[(outsidersSegmentIdx + 1) % n]);
+
+#ifdef DEBUG_CIRCLES
+  drawPoints(outsideCorners, cornersImage, 2, Scalar(128));
+  imshow("corners", outsideCornersImage);
+#endif
 }
 
 void CirclesGridClusterFinder::getSortedCorners(const std::vector<cv::Point2f> &hull2f, const std::vector<cv::Point2f> &corners, const std::vector<cv::Point2f> &outsideCorners, std::vector<cv::Point2f> &sortedCorners)
@@ -346,6 +412,9 @@ void CirclesGridClusterFinder::parsePatternPoints(const std::vector<cv::Point2f>
 
       if(dists[0] > maxRectifiedDistance)
       {
+#ifdef DEBUG_CIRCLES
+        cout << "Pattern not detected: too large rectified distance" << endl;
+#endif
         centers.clear();
         return;
       }
@@ -417,16 +486,16 @@ void Graph::floydWarshall(cv::Mat &distanceMatrix, int infinity) const
 {
   const int edgeWeight = 1;
 
-  const size_t n = getVerticesCount();
+  const int n = (int)getVerticesCount();
   distanceMatrix.create(n, n, CV_32SC1);
   distanceMatrix.setTo(infinity);
   for (Vertices::const_iterator it1 = vertices.begin(); it1 != vertices.end(); it1++)
   {
-    distanceMatrix.at<int> (it1->first, it1->first) = 0;
+    distanceMatrix.at<int> ((int)it1->first, (int)it1->first) = 0;
     for (Neighbors::const_iterator it2 = it1->second.neighbors.begin(); it2 != it1->second.neighbors.end(); it2++)
     {
       assert( it1->first != *it2 );
-      distanceMatrix.at<int> (it1->first, *it2) = edgeWeight;
+      distanceMatrix.at<int> ((int)it1->first, (int)*it2) = edgeWeight;
     }
   }
 
@@ -436,17 +505,17 @@ void Graph::floydWarshall(cv::Mat &distanceMatrix, int infinity) const
     {
       for (Vertices::const_iterator it3 = vertices.begin(); it3 != vertices.end(); it3++)
       {
-        int val1 = distanceMatrix.at<int> (it2->first, it3->first);
+	    int i1 = (int)it1->first, i2 = (int)it2->first, i3 = (int)it3->first;
+        int val1 = distanceMatrix.at<int> (i2, i3);
         int val2;
-        if (distanceMatrix.at<int> (it2->first, it1->first) == infinity || distanceMatrix.at<int> (it1->first,
-                                                                                                   it3->first)
-            == infinity)
+        if (distanceMatrix.at<int> (i2, i1) == infinity ||
+			distanceMatrix.at<int> (i1, i3) == infinity)
           val2 = val1;
         else
         {
-          val2 = distanceMatrix.at<int> (it2->first, it1->first) + distanceMatrix.at<int> (it1->first, it3->first);
+          val2 = distanceMatrix.at<int> (i2, i1) + distanceMatrix.at<int> (i1, i3);
         }
-        distanceMatrix.at<int> (it2->first, it3->first) = (val1 == infinity) ? val2 : std::min(val1, val2);
+        distanceMatrix.at<int> (i2, i3) = (val1 == infinity) ? val2 : std::min(val1, val2);
       }
     }
   }
@@ -748,7 +817,13 @@ Mat CirclesGridFinder::rectifyGrid(Size detectedGridSize, const vector<Point2f>&
   const Point2f offset(150, 150);
 
   vector<Point2f> dstPoints;
-  for (int i = 0; i < detectedGridSize.height; i++)
+  bool isClockwiseBefore =
+      getDirection(centers[0], centers[detectedGridSize.width - 1], centers[centers.size() - 1]) < 0;
+
+  int iStart = isClockwiseBefore ? 0 : detectedGridSize.height - 1;
+  int iEnd = isClockwiseBefore ? detectedGridSize.height : -1;
+  int iStep = isClockwiseBefore ? 1 : -1;
+  for (int i = iStart; i != iEnd; i += iStep)
   {
     for (int j = 0; j < detectedGridSize.width; j++)
     {
@@ -1039,7 +1114,7 @@ void CirclesGridFinder::findBasis(const vector<Point2f> &samples, vector<Point2f
     CV_Error(0, "degenerate basis" );
 
   vector<vector<Point2f> > clusters(2), hulls(2);
-  for (size_t k = 0; k < samples.size(); k++)
+  for (int k = 0; k < (int)samples.size(); k++)
   {
     int label = bestLabels.at<int> (k, 0);
     int idx = -1;
@@ -1150,13 +1225,13 @@ void computePredecessorMatrix(const Mat &dm, int verticesCount, Mat &predecessor
 
 void computeShortestPath(Mat &predecessorMatrix, size_t v1, size_t v2, vector<size_t> &path)
 {
-  if (predecessorMatrix.at<int> (v1, v2) < 0)
+  if (predecessorMatrix.at<int> ((int)v1, (int)v2) < 0)
   {
     path.push_back(v1);
     return;
   }
 
-  computeShortestPath(predecessorMatrix, v1, predecessorMatrix.at<int> (v1, v2), path);
+  computeShortestPath(predecessorMatrix, v1, predecessorMatrix.at<int> ((int)v1, (int)v2), path);
   path.push_back(v2);
 }
 
@@ -1173,7 +1248,7 @@ size_t CirclesGridFinder::findLongestPath(vector<Graph> &basisGraphs, Path &best
     Mat distanceMatrix;
     g.floydWarshall(distanceMatrix, infinity);
     Mat predecessorMatrix;
-    computePredecessorMatrix(distanceMatrix, g.getVerticesCount(), predecessorMatrix);
+    computePredecessorMatrix(distanceMatrix, (int)g.getVerticesCount(), predecessorMatrix);
 
     double maxVal;
     Point maxLoc;
@@ -1197,9 +1272,9 @@ size_t CirclesGridFinder::findLongestPath(vector<Graph> &basisGraphs, Path &best
       longestPaths.push_back(path);
 
       int conf = 0;
-      for (size_t v2 = 0; v2 < path.vertices.size(); v2++)
+      for (int v2 = 0; v2 < (int)path.vertices.size(); v2++)
       {
-        conf += basisGraphs[1 - (int)graphIdx].getDegree(v2);
+        conf += (int)basisGraphs[1 - (int)graphIdx].getDegree(v2);
       }
       confidences.push_back(conf);
     }
@@ -1209,7 +1284,7 @@ size_t CirclesGridFinder::findLongestPath(vector<Graph> &basisGraphs, Path &best
 
   int maxConf = -1;
   int bestPathIdx = -1;
-  for (size_t i = 0; i < confidences.size(); i++)
+  for (int i = 0; i < (int)confidences.size(); i++)
   {
     if (confidences[i] > maxConf)
     {
@@ -1235,7 +1310,7 @@ void CirclesGridFinder::drawBasis(const vector<Point2f> &basis, Point2f origin, 
   for (size_t i = 0; i < basis.size(); i++)
   {
     Point2f pt(basis[i]);
-    line(drawImg, origin, origin + pt, Scalar(0, i * 255, 0), 2);
+    line(drawImg, origin, origin + pt, Scalar(0, (double)(i * 255), 0), 2);
   }
 }
 
@@ -1312,7 +1387,7 @@ Size CirclesGridFinder::getDetectedGridSize() const
   if (holes.size() == 0)
     return Size(0, 0);
 
-  return Size(holes[0].size(), holes.size());
+  return Size((int)holes[0].size(), (int)holes.size());
 }
 
 void CirclesGridFinder::getHoles(vector<Point2f> &outHoles) const
@@ -1405,8 +1480,8 @@ void CirclesGridFinder::getCornerSegments(const vector<vector<size_t> > &points,
   cornerIndices.clear();
   firstSteps.clear();
   secondSteps.clear();
-  size_t h = points.size();
-  size_t w = points[0].size();
+  int h = (int)points.size();
+  int w = (int)points[0].size();
   CV_Assert(h >= 2 && w >= 2)
     ;
 
@@ -1453,6 +1528,10 @@ void CirclesGridFinder::getCornerSegments(const vector<vector<size_t> > &points,
     cout << "Corners are counterclockwise" << endl;
 #endif
     std::reverse(segments.begin(), segments.end());
+    std::reverse(cornerIndices.begin(), cornerIndices.end());
+    std::reverse(firstSteps.begin(), firstSteps.end());
+    std::reverse(secondSteps.begin(), secondSteps.end());
+    std::swap(firstSteps, secondSteps);
   }
 }
 
@@ -1513,4 +1592,10 @@ size_t CirclesGridFinder::getFirstCorner(vector<Point> &largeCornerIndices, vect
   }
 
   return cornerIdx;
+}
+
+bool cv::findCirclesGridDefault( InputArray image, Size patternSize,
+                                 OutputArray centers, int flags )
+{
+  return findCirclesGrid(image, patternSize, centers, flags);
 }

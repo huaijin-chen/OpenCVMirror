@@ -24,11 +24,11 @@
 #ifndef AVCODEC_VAAPI_H
 #define AVCODEC_VAAPI_H
 
-#include <msc_stdint.h>
+#include <stdint.h>
 
 /**
- * \defgroup VAAPI_Decoding VA API Decoding
- * \ingroup Decoder
+ * @defgroup VAAPI_Decoding VA API Decoding
+ * @ingroup Decoder
  * @{
  */
 

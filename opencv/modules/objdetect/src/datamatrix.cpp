@@ -169,7 +169,7 @@ int Sampler::hasbars()
 
 void Sampler::timing()
 {
-  uchar light, dark = getpixel(9, 0);
+  /*uchar light, dark = getpixel(9, 0);
   for (int i = 1; i < 3; i += 2) {
     light = getpixel(9, i);
     // if (light <= dark)
@@ -177,7 +177,7 @@ void Sampler::timing()
     dark = getpixel(9, i + 1);
     // if (up <= down)
     //  goto endo;
-  }
+  }*/
 }
 
 CvMat *Sampler::extract()
@@ -191,6 +191,7 @@ CvMat *Sampler::extract()
   return r;
 }
 
+#if CV_SSE2
 static void apron(CvMat *v)
 {
   int r = v->rows;
@@ -331,11 +332,12 @@ static deque<CvPoint> trailto(CvMat *v, int x, int y, CvMat *terminal)
     y += yd;
   }
 
-  int l = r.size() * 9 / 10;
+  int l = (int)(r.size() * 9 / 10);
   while (l--)
     r.pop_front();
   return r;
 }
+#endif
 
 deque <CvDataMatrixCode> cvFindDataMatrix(CvMat *im)
 {
@@ -397,8 +399,8 @@ deque <CvDataMatrixCode> cvFindDataMatrix(CvMat *im)
         __m128i v = _mm_loadu_si128((const __m128i*)cd);
         __m128 cyxyxA = _mm_cvtepi32_ps(_mm_srai_epi32(_mm_unpacklo_epi16(v, v), 16));
         __m128 cyxyxB = _mm_cvtepi32_ps(_mm_srai_epi32(_mm_unpackhi_epi16(v, v), 16));
-        __m128 cx = _mm_shuffle_ps(cyxyxA, cyxyxB, _MM_SHUFFLE(0, 2, 0, 2));
-        __m128 cy = _mm_shuffle_ps(cyxyxA, cyxyxB, _MM_SHUFFLE(1, 3, 1, 3));
+        __m128 cx = _mm_shuffle_ps(cyxyxA, cyxyxB, _MM_SHUFFLE(2, 0, 2, 0));
+        __m128 cy = _mm_shuffle_ps(cyxyxA, cyxyxB, _MM_SHUFFLE(3, 1, 3, 1));
         __m128 cmag = _mm_sqrt_ps(_mm_add_ps(_mm_mul_ps(cx, cx), _mm_mul_ps(cy, cy)));
         __m128 crmag = _mm_rcp_ps(cmag);
         __m128 ncx = _mm_mul_ps(cx, crmag);
@@ -407,8 +409,8 @@ deque <CvDataMatrixCode> cvFindDataMatrix(CvMat *im)
         v = _mm_loadu_si128((const __m128i*)ccd);
         __m128 ccyxyxA = _mm_cvtepi32_ps(_mm_srai_epi32(_mm_unpacklo_epi16(v, v), 16));
         __m128 ccyxyxB = _mm_cvtepi32_ps(_mm_srai_epi32(_mm_unpackhi_epi16(v, v), 16));
-        __m128 ccx = _mm_shuffle_ps(ccyxyxA, ccyxyxB, _MM_SHUFFLE(0, 2, 0, 2));
-        __m128 ccy = _mm_shuffle_ps(ccyxyxA, ccyxyxB, _MM_SHUFFLE(1, 3, 1, 3));
+        __m128 ccx = _mm_shuffle_ps(ccyxyxA, ccyxyxB, _MM_SHUFFLE(2, 0, 2, 0));
+        __m128 ccy = _mm_shuffle_ps(ccyxyxA, ccyxyxB, _MM_SHUFFLE(3, 1, 3, 1));
         __m128 ccmag = _mm_sqrt_ps(_mm_add_ps(_mm_mul_ps(ccx, ccx), _mm_mul_ps(ccy, ccy)));
         __m128 ccrmag = _mm_rcp_ps(ccmag);
         __m128 nccx = _mm_mul_ps(ccx, ccrmag);
@@ -455,7 +457,7 @@ deque <CvDataMatrixCode> cvFindDataMatrix(CvMat *im)
           }
         }
         if (codes.size() > 0) {
-          printf("searching for more\n");
+          //printf("searching for more\n");
         }
         if (decode(sa, cc)) {
           codes.push_back(cc);
@@ -491,64 +493,83 @@ endo: ; // end search for this o
 }
 
 #include <opencv2/imgproc/imgproc.hpp>
-#include <opencv2/highgui/highgui.hpp>
 
 namespace cv
 {
-namespace
+    
+void findDataMatrix(InputArray _image,
+                    vector<string>& codes,
+                    OutputArray _corners,
+                    OutputArrayOfArrays _dmtx)
 {
-  struct CvDM2DM_transform
-  {
-    DataMatrixCode operator()(CvDataMatrixCode& cvdm)
+    Mat image = _image.getMat();
+    CvMat m(image);
+    deque <CvDataMatrixCode> rc = cvFindDataMatrix(&m);
+    int i, n = (int)rc.size();
+    Mat corners;
+    
+    if( _corners.needed() )
     {
-      DataMatrixCode dm;
-      std::memcpy(dm.msg,cvdm.msg,sizeof(cvdm.msg));
-      dm.original = cv::Mat(cvdm.original,true);
-      cvReleaseMat(&cvdm.original);
-      cv::Mat c(cvdm.corners,true);
-      dm.corners[0] = c.at<Point>(0,0);
-      dm.corners[1] = c.at<Point>(1,0);
-      dm.corners[2] = c.at<Point>(2,0);
-      dm.corners[3] = c.at<Point>(3,0);
-      cvReleaseMat(&cvdm.corners);
-      return dm;
+        _corners.create(n, 4, CV_32SC2);
+        corners = _corners.getMat();
     }
-  };
-  
-  struct DrawDataMatrixCode
-  {
-    DrawDataMatrixCode(cv::Mat& image):image(image){}
-    void operator()(const DataMatrixCode& code)
+    
+    if( _dmtx.needed() )
+        _dmtx.create(n, 1, CV_8U);
+    
+    codes.resize(n);
+    
+    for( i = 0; i < n; i++ )
     {
-      Scalar c(0, 255, 0);
-      Scalar c2(255, 0,0);
-      line(image, code.corners[0], code.corners[1], c);
-      line(image, code.corners[1], code.corners[2], c);
-      line(image, code.corners[2], code.corners[3], c);
-      line(image, code.corners[3], code.corners[0], c);
-      string code_text(code.msg,4);
-      int baseline = 0;
-      Size sz = getTextSize(code_text, CV_FONT_HERSHEY_SIMPLEX, 1, 1, &baseline);
-      putText(image, code_text, code.corners[0], CV_FONT_HERSHEY_SIMPLEX, 0.8, c2, 1, CV_AA, false);
+        CvDataMatrixCode& rc_i = rc[i];
+        codes[i] = string(rc_i.msg);
+        
+        if( corners.data )
+        {
+            const Point* srcpt = (Point*)rc_i.corners->data.ptr;
+            Point* dstpt = (Point*)corners.ptr(i);
+            for( int k = 0; k < 4; k++ )
+                dstpt[k] = srcpt[k];
+        }
+        cvReleaseMat(&rc_i.corners);
+        
+        if( _dmtx.needed() )
+        {
+            _dmtx.create(rc_i.original->rows, rc_i.original->cols, rc_i.original->type, i);
+            Mat dst = _dmtx.getMat(i);
+            Mat(rc_i.original).copyTo(dst);
+        }
+        cvReleaseMat(&rc_i.original);
     }
-    cv::Mat& image;
-
-    DrawDataMatrixCode& operator=(const DrawDataMatrixCode&);
-  };
 }
 
-void findDataMatrix(const cv::Mat& image, std::vector<DataMatrixCode>& codes)
+void drawDataMatrixCodes(InputOutputArray _image,
+                         const vector<string>& codes,
+                         InputArray _corners)
 {
-  CvMat m(image);
-  deque <CvDataMatrixCode> rc = cvFindDataMatrix(&m);
-  codes.clear();
-  codes.resize(rc.size());
-  std::transform(rc.begin(),rc.end(),codes.begin(),CvDM2DM_transform());  
+    Mat image = _image.getMat();
+    Mat corners = _corners.getMat();
+    int i, n = corners.rows;
+    
+    if( n > 0 )
+    {
+        CV_Assert( corners.depth() == CV_32S &&
+                  corners.cols*corners.channels() == 8 &&
+                  n == (int)codes.size() );
+    }
+    
+    for( i = 0; i < n; i++ )
+    {
+        Scalar c(0, 255, 0);
+        Scalar c2(255, 0,0);
+        const Point* pt = (const Point*)corners.ptr(i);
+        
+        for( int k = 0; k < 4; k++ )
+            line(image, pt[k], pt[(k+1)%4], c);
+        //int baseline = 0;
+        //Size sz = getTextSize(code_text, CV_FONT_HERSHEY_SIMPLEX, 1, 1, &baseline);
+        putText(image, codes[i], pt[0], CV_FONT_HERSHEY_SIMPLEX, 0.8, c2, 1, CV_AA, false);
+    }
 }
-
-void drawDataMatrixCodes(const std::vector<DataMatrixCode>& codes, Mat& drawImage)
-{
-  std::for_each(codes.begin(),codes.end(),DrawDataMatrixCode(drawImage));
-}
-
+    
 }

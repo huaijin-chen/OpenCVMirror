@@ -2,6 +2,8 @@
 #include "opencv2/core/core.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
 #include "opencv2/features2d/features2d.hpp"
+#include "opencv2/nonfree/nonfree.hpp"
+#include "opencv2/legacy/legacy.hpp"
 
 #include <iostream>
 #include <fstream>
@@ -12,14 +14,17 @@ using namespace cv;
 void help()
 {
     cout << "This program shows the use of the Calonder point descriptor classifier"
-    		"SURF is used to detect interest points, Calonder is used to describe/match these points\n"
-    		"Format:" << endl <<
+            "SURF is used to detect interest points, Calonder is used to describe/match these points\n"
+            "Format:" << endl <<
             "   classifier_file(to write) test_image file_with_train_images_filenames(txt)" <<
             "   or" << endl <<
-            "   classifier_file(to read) test_image"
-    		"Using OpenCV version %s\n" << CV_VERSION << "\n"
-            << endl;
+            "   classifier_file(to read) test_image" << "\n" << endl <<
+            "Using OpenCV version " << CV_VERSION << "\n" << endl;
+
+    return;
 }
+
+
 /*
  * Generates random perspective transform of image
  */
@@ -120,7 +125,7 @@ void testCalonderClassifier( const string& classifierFilename, const string& img
     Mat descriptors2;  de.compute( img2, keypoints2, descriptors2 );
 
     // Match descriptors
-    BruteForceMatcher<L1<float> > matcher;
+    BFMatcher matcher(NORM_L1);
     vector<DMatch> matches;
     matcher.match( descriptors1, descriptors2, matches );
 
@@ -131,7 +136,7 @@ void testCalonderClassifier( const string& classifierFilename, const string& img
     Mat points1t; perspectiveTransform(Mat(points1), points1t, H12);
     for( size_t mi = 0; mi < matches.size(); mi++ )
     {
-        if( norm(points2[matches[mi].trainIdx] - points1t.at<Point2f>(mi,0)) < 4 ) // inlier
+        if( norm(points2[matches[mi].trainIdx] - points1t.at<Point2f>((int)mi,0)) < 4 ) // inlier
             matchesMask[mi] = 1;
     }
 
@@ -148,7 +153,7 @@ int main( int argc, char **argv )
 {
     if( argc != 4 && argc != 3 )
     {
-    	help();
+        help();
         return -1;
     }
 

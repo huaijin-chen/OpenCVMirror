@@ -3,6 +3,7 @@ import os, sys, re, string
 # the list only for debugging. The real list, used in the real OpenCV build, is specified in CMakeLists.txt
 opencv_hdr_list = [
 "../../core/include/opencv2/core/core.hpp",
+"../../flann/include/opencv2/flann/miniflann.hpp",
 "../../ml/include/opencv2/ml/ml.hpp",
 "../../imgproc/include/opencv2/imgproc/imgproc.hpp",
 "../../calib3d/include/opencv2/calib3d/calib3d.hpp",
@@ -10,8 +11,7 @@ opencv_hdr_list = [
 "../../video/include/opencv2/video/tracking.hpp",
 "../../video/include/opencv2/video/background_segm.hpp",
 "../../objdetect/include/opencv2/objdetect/objdetect.hpp",
-"../../highgui/include/opencv2/highgui/highgui.hpp",
-"opencv_extra_api.hpp",
+"../../highgui/include/opencv2/highgui/highgui.hpp"
 ]
 
 """
@@ -191,7 +191,7 @@ class CppHeaderParser(object):
         if add_star:
             arg_type += "*"
 
-        arg_type = self.batch_replace(arg_type, [("std::", ""), ("cv::", "")])
+        arg_type = self.batch_replace(arg_type, [("std::", ""), ("cv::", ""), ("::", "_")])
 
         return arg_type, arg_name, modlist, argno
 
@@ -235,7 +235,7 @@ class CppHeaderParser(object):
             modlist.append("=" + macro_arg)
             l = l[:npos] + l[npos3+1:]
 
-        l = self.batch_replace(l, [("CV_EXPORTS_W", ""), ("CV_EXPORTS", ""), ("public ", " "), ("::", ".")]).strip()
+        l = self.batch_replace(l, [("CV_EXPORTS_W", ""), ("CV_EXPORTS", ""), ("public virtual ", " "), ("public ", " "), ("::", ".")]).strip()
         ll = re.split(r'\s*[,:]?\s*', l)
         ll = [le for le in ll if le]
         classname = ll[1]
@@ -253,7 +253,7 @@ class CppHeaderParser(object):
             fnpos = 0
         fname = fname[fnpos:].strip()
         rettype = fdecl[:fnpos].strip()
-        
+
         if rettype.endswith("operator"):
             fname = ("operator " + fname).strip()
             rettype = rettype[:rettype.rfind("operator")].strip()
@@ -265,16 +265,16 @@ class CppHeaderParser(object):
                 else:
                     fname = rettype + fname
                     rettype = ""
-        
+
         apos = fdecl.find("(")
         if fname.endswith("operator"):
             fname += "()"
             apos = fdecl.find("(", apos+1)
-            
+
         fname = "cv." + fname.replace("::", ".")
         decl = [fname, rettype, [], []]
         args0str = fdecl[apos+1:fdecl.rfind(")")].strip()
-        
+
         if args0str != "":
             args0 = args0str.split(",")
 
@@ -287,17 +287,19 @@ class CppHeaderParser(object):
                 if balance_paren == 0 and balance_angle == 0:
                     args.append(narg.strip())
                     narg = ""
-        
+
             for arg in args:
                 dfpos = arg.find("=")
                 defval = ""
                 if dfpos >= 0:
                     defval = arg[dfpos+1:].strip()
                     arg = arg[:dfpos].strip()
-                pos = arg.rfind(" ")
+                pos = len(arg)-1
+                while pos >= 0 and (arg[pos] == "_" or arg[pos].isalpha() or arg[pos].isdigit()):
+                    pos -= 1
                 if pos >= 0:
                     aname = arg[pos+1:].strip()
-                    atype = arg[:pos].strip()
+                    atype = arg[:pos+1].strip()
                     if aname.endswith("&") or aname.endswith("*") or (aname in ["int", "string", "Mat"]):
                         atype = (atype + " " + aname).strip()
                         aname = "param"
@@ -305,7 +307,7 @@ class CppHeaderParser(object):
                     atype = arg
                     aname = "param"
                 decl[3].append([atype, aname, defval, []])
-        
+
         return decl
 
     def parse_func_decl(self, decl_str):
@@ -324,11 +326,11 @@ class CppHeaderParser(object):
             if not (("CV_EXPORTS_AS" in decl_str) or ("CV_EXPORTS_W" in decl_str) or \
                 ("CV_WRAP" in decl_str) or ("CV_WRAP_AS" in decl_str)):
                 return []
-        
-        # ignore old API in the documentation check (for now)        
+
+        # ignore old API in the documentation check (for now)
         if "CVAPI(" in decl_str:
-            return [] 
-                
+            return []
+
         top = self.block_stack[-1]
         func_modlist = []
 
@@ -452,13 +454,19 @@ class CppHeaderParser(object):
                         a = a[:eqpos].strip()
                     arg_type, arg_name, modlist, argno = self.parse_arg(a, argno)
                     if self.wrap_mode:
-                        if arg_type == "InputArray" or arg_type == "InputOutputArray":
+                        if arg_type == "InputArray":
                             arg_type = "Mat"
+                        elif arg_type == "InputOutputArray":
+                            arg_type = "Mat"
+                            modlist.append("/IO")
                         elif arg_type == "OutputArray":
                             arg_type = "Mat"
                             modlist.append("/O")
-                        elif arg_type == "InputArrayOfArrays" or arg_type == "InputOutputArrayOfArrays":
+                        elif arg_type == "InputArrayOfArrays":
                             arg_type = "vector_Mat"
+                        elif arg_type == "InputOutputArrayOfArrays":
+                            arg_type = "vector_Mat"
+                            modlist.append("/IO")
                         elif arg_type == "OutputArrayOfArrays":
                             arg_type = "vector_Mat"
                             modlist.append("/O")

@@ -39,329 +39,517 @@
 //
 //M*/
 
-#include <iostream>
-#include <cmath>
-#include <limits>
-#include "test_precomp.hpp"
+#include "precomp.hpp"
 
-using namespace cv;
-using namespace std;
-using namespace gpu;
+namespace {
 
-class CV_GpuNppFilterTest : public cvtest::BaseTest
+IMPLEMENT_PARAM_CLASS(KSize, cv::Size)
+
+cv::Mat getInnerROI(cv::InputArray m_, cv::Size ksize)
 {
-public:
-    CV_GpuNppFilterTest(const char* /*test_name*/, const char* /*test_funcs*/) {}
-    virtual ~CV_GpuNppFilterTest() {}
-
-protected:
-    void run(int);
-    virtual int test(const Mat& img) = 0;
-    
-    int test8UC1(const Mat& img)
-    {
-        cv::Mat img_C1;
-        cvtColor(img, img_C1, CV_BGR2GRAY);
-        return test(img_C1);
-    }
-
-    int test8UC4(const Mat& img)
-    {
-        cv::Mat img_C4;
-        cvtColor(img, img_C4, CV_BGR2BGRA);
-        return test(img_C4);
-    }
-        
-    int CheckNorm(const Mat& m1, const Mat& m2, const Size& ksize)
-    {
-        Rect roi = Rect(ksize.width, ksize.height, m1.cols - 2 * ksize.width, m1.rows - 2 * ksize.height);
-        Mat m1ROI = m1(roi);
-        Mat m2ROI = m2(roi);
-
-        double res = norm(m1ROI, m2ROI, NORM_INF);
-
-        // Max difference (2.0) in GaussianBlur
-        if (res <= 2)
-            return cvtest::TS::OK;
-        
-        ts->printf(cvtest::TS::LOG, "Norm: %f\n", res);
-        return cvtest::TS::FAIL_GENERIC;
-    }
-};
-
-void CV_GpuNppFilterTest::run( int )
-{    
-    cv::Mat img = cv::imread(std::string(ts->get_data_path()) + "stereobp/aloe-L.png");
-    
-    if (img.empty())
-    {
-        ts->set_failed_test_info(cvtest::TS::FAIL_MISSING_TEST_DATA);
-        return;
-    }
-
-    //run tests
-    int testResult = cvtest::TS::OK;
-
-    if (test8UC1(img) != cvtest::TS::OK)
-        testResult = cvtest::TS::FAIL_GENERIC;
-
-    if (test8UC4(img) != cvtest::TS::OK)
-        testResult = cvtest::TS::FAIL_GENERIC;
-
-    ts->set_failed_test_info(testResult);
-
-    ts->set_failed_test_info(cvtest::TS::OK);
+    cv::Mat m = getMat(m_);
+    cv::Rect roi(ksize.width, ksize.height, m.cols - 2 * ksize.width, m.rows - 2 * ksize.height);
+    return m(roi);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// blur
-struct CV_GpuNppImageBlurTest : public CV_GpuNppFilterTest
+cv::Mat getInnerROI(cv::InputArray m, int ksize)
 {
-    CV_GpuNppImageBlurTest() : CV_GpuNppFilterTest( "GPU-NppImageBlur", "blur" ) {}
+    return getInnerROI(m, cv::Size(ksize, ksize));
+}
 
-    int test(const Mat& img)
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// Blur
+
+IMPLEMENT_PARAM_CLASS(Anchor, cv::Point)
+
+PARAM_TEST_CASE(Blur, cv::gpu::DeviceInfo, cv::Size, MatType, KSize, Anchor, UseRoi)
+{
+    cv::gpu::DeviceInfo devInfo;
+    cv::Size size;
+    int type;
+    cv::Size ksize;
+    cv::Point anchor;
+    bool useRoi;
+
+    virtual void SetUp()
     {
-        int ksizes[] = {3, 5, 7};
-        int ksizes_num = sizeof(ksizes) / sizeof(int);
+        devInfo = GET_PARAM(0);
+        size = GET_PARAM(1);
+        type = GET_PARAM(2);
+        ksize = GET_PARAM(3);
+        anchor = GET_PARAM(4);
+        useRoi = GET_PARAM(5);
 
-        int test_res = cvtest::TS::OK;
-
-        for (int i = 0; i < ksizes_num; ++i)
-        {
-            for (int j = 0; j < ksizes_num; ++j)
-            {
-                Size ksize(ksizes[i], ksizes[j]);
-
-                ts->printf(cvtest::TS::LOG, "\nksize = (%dx%d)\n", ksizes[i], ksizes[j]);
-
-                Mat cpudst;
-                cv::blur(img, cpudst, ksize);
-
-                GpuMat gpu1(img);
-                GpuMat gpudst;
-                cv::gpu::blur(gpu1, gpudst, ksize);
-
-                if (CheckNorm(cpudst, gpudst, ksize) != cvtest::TS::OK)
-                    test_res = cvtest::TS::FAIL_GENERIC;
-            }
-        }
-
-        return test_res;
+        cv::gpu::setDevice(devInfo.deviceID());
     }
 };
 
-////////////////////////////////////////////////////////////////////////////////
+TEST_P(Blur, Accuracy)
+{
+    cv::Mat src = randomMat(size, type);
+
+    cv::gpu::GpuMat dst = createMat(size, type, useRoi);
+    cv::gpu::blur(loadMat(src, useRoi), dst, ksize, anchor);
+
+    cv::Mat dst_gold;
+    cv::blur(src, dst_gold, ksize, anchor);
+
+    EXPECT_MAT_NEAR(getInnerROI(dst_gold, ksize), getInnerROI(dst, ksize), 1.0);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Filter, Blur, testing::Combine(
+    ALL_DEVICES,
+    DIFFERENT_SIZES,
+    testing::Values(MatType(CV_8UC1), MatType(CV_8UC4)),
+    testing::Values(KSize(cv::Size(3, 3)), KSize(cv::Size(5, 5)), KSize(cv::Size(7, 7))),
+    testing::Values(Anchor(cv::Point(-1, -1)), Anchor(cv::Point(0, 0)), Anchor(cv::Point(2, 2))),
+    WHOLE_SUBMAT));
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
 // Sobel
-struct CV_GpuNppImageSobelTest : public CV_GpuNppFilterTest
+
+IMPLEMENT_PARAM_CLASS(Deriv_X, int)
+IMPLEMENT_PARAM_CLASS(Deriv_Y, int)
+
+PARAM_TEST_CASE(Sobel, cv::gpu::DeviceInfo, cv::Size, MatType, KSize, Deriv_X, Deriv_Y, BorderType, UseRoi)
 {
-    CV_GpuNppImageSobelTest() : CV_GpuNppFilterTest( "GPU-NppImageSobel", "Sobel" ) {}
+    cv::gpu::DeviceInfo devInfo;
+    cv::Size size;
+    int type;
+    cv::Size ksize;
+    int dx;
+    int dy;
+    int borderType;
+    bool useRoi;
 
-    int test(const Mat& img)
+    virtual void SetUp()
     {
-        int ksizes[] = {3, 5, 7};
-        int ksizes_num = sizeof(ksizes) / sizeof(int);
+        devInfo = GET_PARAM(0);
+        size = GET_PARAM(1);
+        type = GET_PARAM(2);
+        ksize = GET_PARAM(3);
+        dx = GET_PARAM(4);
+        dy = GET_PARAM(5);
+        borderType = GET_PARAM(6);
+        useRoi = GET_PARAM(7);
 
-        int dx = 1, dy = 0;
-
-        int test_res = cvtest::TS::OK;
-
-        for (int i = 0; i < ksizes_num; ++i)
-        {
-            ts->printf(cvtest::TS::LOG, "\nksize = %d\n", ksizes[i]);
-
-            Mat cpudst;
-            cv::Sobel(img, cpudst, -1, dx, dy, ksizes[i]);
-
-            GpuMat gpu1(img);
-            GpuMat gpudst;
-            cv::gpu::Sobel(gpu1, gpudst, -1, dx, dy, ksizes[i]);
-
-            if (CheckNorm(cpudst, gpudst, Size(ksizes[i], ksizes[i])) != cvtest::TS::OK)
-                test_res = cvtest::TS::FAIL_GENERIC;
-        }
-
-        return test_res;
+        cv::gpu::setDevice(devInfo.deviceID());
     }
 };
 
-////////////////////////////////////////////////////////////////////////////////
+TEST_P(Sobel, Accuracy)
+{
+    if (dx == 0 && dy == 0)
+        return;
+
+    cv::Mat src = randomMat(size, type);
+
+    cv::gpu::GpuMat dst = createMat(size, type, useRoi);
+    cv::gpu::Sobel(loadMat(src, useRoi), dst, -1, dx, dy, ksize.width, 1.0, borderType);
+
+    cv::Mat dst_gold;
+    cv::Sobel(src, dst_gold, -1, dx, dy, ksize.width, 1.0, 0.0, borderType);
+
+    EXPECT_MAT_NEAR(dst_gold, dst, 0.0);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Filter, Sobel, testing::Combine(
+    ALL_DEVICES,
+    DIFFERENT_SIZES,
+    testing::Values(MatType(CV_8UC1), MatType(CV_8UC4)),
+    testing::Values(KSize(cv::Size(3, 3)), KSize(cv::Size(5, 5)), KSize(cv::Size(7, 7))),
+    testing::Values(Deriv_X(0), Deriv_X(1), Deriv_X(2)),
+    testing::Values(Deriv_Y(0), Deriv_Y(1), Deriv_Y(2)),
+    testing::Values(BorderType(cv::BORDER_REFLECT101),
+                    BorderType(cv::BORDER_REPLICATE),
+                    BorderType(cv::BORDER_CONSTANT),
+                    BorderType(cv::BORDER_REFLECT)),
+    WHOLE_SUBMAT));
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
 // Scharr
-struct CV_GpuNppImageScharrTest : public CV_GpuNppFilterTest
+
+PARAM_TEST_CASE(Scharr, cv::gpu::DeviceInfo, cv::Size, MatType, Deriv_X, Deriv_Y, BorderType, UseRoi)
 {
-    CV_GpuNppImageScharrTest() : CV_GpuNppFilterTest( "GPU-NppImageScharr", "Scharr" ) {}
+    cv::gpu::DeviceInfo devInfo;
+    cv::Size size;
+    int type;
+    int dx;
+    int dy;
+    int borderType;
+    bool useRoi;
 
-    int test(const Mat& img)
+    virtual void SetUp()
     {
-        int dx = 1, dy = 0;
+        devInfo = GET_PARAM(0);
+        size = GET_PARAM(1);
+        type = GET_PARAM(2);
+        dx = GET_PARAM(3);
+        dy = GET_PARAM(4);
+        borderType = GET_PARAM(5);
+        useRoi = GET_PARAM(6);
 
-        Mat cpudst;
-        cv::Scharr(img, cpudst, -1, dx, dy);
-
-        GpuMat gpu1(img);
-        GpuMat gpudst;
-        cv::gpu::Scharr(gpu1, gpudst, -1, dx, dy);
-                
-        return CheckNorm(cpudst, gpudst, Size(3, 3));
+        cv::gpu::setDevice(devInfo.deviceID());
     }
 };
 
+TEST_P(Scharr, Accuracy)
+{
+    if (dx + dy != 1)
+        return;
 
-////////////////////////////////////////////////////////////////////////////////
+    cv::Mat src = randomMat(size, type);
+
+    cv::gpu::GpuMat dst = createMat(size, type, useRoi);
+    cv::gpu::Scharr(loadMat(src, useRoi), dst, -1, dx, dy, 1.0, borderType);
+
+    cv::Mat dst_gold;
+    cv::Scharr(src, dst_gold, -1, dx, dy, 1.0, 0.0, borderType);
+
+    EXPECT_MAT_NEAR(dst_gold, dst, 0.0);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Filter, Scharr, testing::Combine(
+    ALL_DEVICES,
+    DIFFERENT_SIZES,
+    testing::Values(MatType(CV_8UC1), MatType(CV_8UC4)),
+    testing::Values(Deriv_X(0), Deriv_X(1)),
+    testing::Values(Deriv_Y(0), Deriv_Y(1)),
+    testing::Values(BorderType(cv::BORDER_REFLECT101),
+                    BorderType(cv::BORDER_REPLICATE),
+                    BorderType(cv::BORDER_CONSTANT),
+                    BorderType(cv::BORDER_REFLECT)),
+    WHOLE_SUBMAT));
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
 // GaussianBlur
-struct CV_GpuNppImageGaussianBlurTest : public CV_GpuNppFilterTest
+
+PARAM_TEST_CASE(GaussianBlur, cv::gpu::DeviceInfo, cv::Size, MatType, KSize, BorderType, UseRoi)
 {
-    CV_GpuNppImageGaussianBlurTest() : CV_GpuNppFilterTest( "GPU-NppImageGaussianBlur", "GaussianBlur" ) {}
+    cv::gpu::DeviceInfo devInfo;
+    cv::Size size;
+    int type;
+    cv::Size ksize;
+    int borderType;
+    bool useRoi;
 
-    int test(const Mat& img)
+    virtual void SetUp()
     {
-        int ksizes[] = {3, 5, 7};
-        int ksizes_num = sizeof(ksizes) / sizeof(int);
+        devInfo = GET_PARAM(0);
+        size = GET_PARAM(1);
+        type = GET_PARAM(2);
+        ksize = GET_PARAM(3);
+        borderType = GET_PARAM(4);
+        useRoi = GET_PARAM(5);
 
-        int test_res = cvtest::TS::OK;
-
-        const double sigma1 = 3.0;
-
-        for (int i = 0; i < ksizes_num; ++i)
-        {
-            for (int j = 0; j < ksizes_num; ++j)
-            {
-                cv::Size ksize(ksizes[i], ksizes[j]);
-
-                ts->printf(cvtest::TS::LOG, "ksize = (%dx%d)\t\n", ksizes[i], ksizes[j]);
-
-                Mat cpudst;
-                cv::GaussianBlur(img, cpudst, ksize, sigma1);
-
-                GpuMat gpu1(img);
-                GpuMat gpudst;
-                cv::gpu::GaussianBlur(gpu1, gpudst, ksize, sigma1);
-
-                if (CheckNorm(cpudst, gpudst, ksize) != cvtest::TS::OK)
-                    test_res = cvtest::TS::FAIL_GENERIC;
-            }
-        }
-
-        return test_res;
+        cv::gpu::setDevice(devInfo.deviceID());
     }
 };
 
-////////////////////////////////////////////////////////////////////////////////
+TEST_P(GaussianBlur, Accuracy)
+{
+    cv::Mat src = randomMat(size, type);
+    double sigma1 = randomDouble(0.1, 1.0);
+    double sigma2 = randomDouble(0.1, 1.0);
+
+    if (ksize.height > 16 && !supportFeature(devInfo, cv::gpu::FEATURE_SET_COMPUTE_20))
+    {
+        try
+        {
+            cv::gpu::GpuMat dst;
+            cv::gpu::GaussianBlur(loadMat(src), dst, ksize, sigma1, sigma2, borderType);
+        }
+        catch (const cv::Exception& e)
+        {
+            ASSERT_EQ(CV_StsNotImplemented, e.code);
+        }
+    }
+    else
+    {
+        cv::gpu::GpuMat dst = createMat(size, type, useRoi);
+        cv::gpu::GaussianBlur(loadMat(src, useRoi), dst, ksize, sigma1, sigma2, borderType);
+
+        cv::Mat dst_gold;
+        cv::GaussianBlur(src, dst_gold, ksize, sigma1, sigma2, borderType);
+
+        EXPECT_MAT_NEAR(dst_gold, dst, 4.0);
+    }
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Filter, GaussianBlur, testing::Combine(
+    ALL_DEVICES,
+    DIFFERENT_SIZES,
+    testing::Values(MatType(CV_8UC1), MatType(CV_8UC4)),
+    testing::Values(KSize(cv::Size(3, 3)),
+                    KSize(cv::Size(5, 5)),
+                    KSize(cv::Size(7, 7)),
+                    KSize(cv::Size(9, 9)),
+                    KSize(cv::Size(11, 11)),
+                    KSize(cv::Size(13, 13)),
+                    KSize(cv::Size(15, 15)),
+                    KSize(cv::Size(17, 17)),
+                    KSize(cv::Size(19, 19)),
+                    KSize(cv::Size(21, 21)),
+                    KSize(cv::Size(23, 23)),
+                    KSize(cv::Size(25, 25)),
+                    KSize(cv::Size(27, 27)),
+                    KSize(cv::Size(29, 29)),
+                    KSize(cv::Size(31, 31))),
+    testing::Values(BorderType(cv::BORDER_REFLECT101),
+                    BorderType(cv::BORDER_REPLICATE),
+                    BorderType(cv::BORDER_CONSTANT),
+                    BorderType(cv::BORDER_REFLECT)),
+    WHOLE_SUBMAT));
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
 // Laplacian
-struct CV_GpuNppImageLaplacianTest : public CV_GpuNppFilterTest
+
+PARAM_TEST_CASE(Laplacian, cv::gpu::DeviceInfo, cv::Size, MatType, KSize, UseRoi)
 {
-    CV_GpuNppImageLaplacianTest() : CV_GpuNppFilterTest( "GPU-NppImageLaplacian", "Laplacian" ) {}
+    cv::gpu::DeviceInfo devInfo;
+    cv::Size size;
+    int type;
+    cv::Size ksize;
+    bool useRoi;
 
-    int test(const Mat& img)
+    virtual void SetUp()
     {
-        int ksizes[] = {1, 3};
-        int ksizes_num = sizeof(ksizes) / sizeof(int);
+        devInfo = GET_PARAM(0);
+        size = GET_PARAM(1);
+        type = GET_PARAM(2);
+        ksize = GET_PARAM(3);
+        useRoi = GET_PARAM(4);
 
-        int test_res = cvtest::TS::OK;
-
-        for (int i = 0; i < ksizes_num; ++i)
-        {
-            ts->printf(cvtest::TS::LOG, "\nksize = %d\n", ksizes[i]);
-
-            Mat cpudst;
-            cv::Laplacian(img, cpudst, -1, ksizes[i]);
-
-            GpuMat gpu1(img);
-            GpuMat gpudst;
-            cv::gpu::Laplacian(gpu1, gpudst, -1, ksizes[i]);
-
-            if (CheckNorm(cpudst, gpudst, Size(3, 3)) != cvtest::TS::OK)
-                test_res = cvtest::TS::FAIL_GENERIC;
-        }
-
-        return test_res;
+        cv::gpu::setDevice(devInfo.deviceID());
     }
 };
 
-////////////////////////////////////////////////////////////////////////////////
+TEST_P(Laplacian, Accuracy)
+{
+    cv::Mat src = randomMat(size, type);
+
+    cv::gpu::GpuMat dst = createMat(size, type, useRoi);
+    cv::gpu::Laplacian(loadMat(src, useRoi), dst, -1, ksize.width);
+
+    cv::Mat dst_gold;
+    cv::Laplacian(src, dst_gold, -1, ksize.width);
+
+    EXPECT_MAT_NEAR(dst_gold, dst, 0.0);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Filter, Laplacian, testing::Combine(
+    ALL_DEVICES,
+    DIFFERENT_SIZES,
+    testing::Values(MatType(CV_8UC1), MatType(CV_8UC4), MatType(CV_32FC1)),
+    testing::Values(KSize(cv::Size(1, 1)), KSize(cv::Size(3, 3))),
+    WHOLE_SUBMAT));
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
 // Erode
-class CV_GpuErodeTest : public CV_GpuNppFilterTest
+
+IMPLEMENT_PARAM_CLASS(Iterations, int)
+
+PARAM_TEST_CASE(Erode, cv::gpu::DeviceInfo, cv::Size, MatType, Anchor, Iterations, UseRoi)
 {
-public:
-    CV_GpuErodeTest() : CV_GpuNppFilterTest( "GPU-NppErode", "erode" ) {} 
+    cv::gpu::DeviceInfo devInfo;
+    cv::Size size;
+    int type;
+    cv::Point anchor;
+    int iterations;
+    bool useRoi;
 
-protected:
-	virtual int test(const Mat& img)
+    virtual void SetUp()
     {
-        Mat kernel(Mat::ones(3, 3, CV_8U));
+        devInfo = GET_PARAM(0);
+        size = GET_PARAM(1);
+        type = GET_PARAM(2);
+        anchor = GET_PARAM(3);
+        iterations = GET_PARAM(4);
+        useRoi = GET_PARAM(5);
 
-	    cv::Mat cpuRes;
-        cv::erode(img, cpuRes, kernel);
-
-	    GpuMat gpuRes;
-        cv::gpu::erode(GpuMat(img), gpuRes, kernel);
-
-	    return CheckNorm(cpuRes, gpuRes, Size(3, 3));
+        cv::gpu::setDevice(devInfo.deviceID());
     }
 };
 
-////////////////////////////////////////////////////////////////////////////////
+TEST_P(Erode, Accuracy)
+{
+    cv::Mat src = randomMat(size, type);
+    cv::Mat kernel = cv::Mat::ones(3, 3, CV_8U);
+
+    cv::gpu::GpuMat dst = createMat(size, type, useRoi);
+    cv::gpu::erode(loadMat(src, useRoi), dst, kernel, anchor, iterations);
+
+    cv::Mat dst_gold;
+    cv::erode(src, dst_gold, kernel, anchor, iterations);
+
+    cv::Size ksize = cv::Size(kernel.cols + iterations * (kernel.cols - 1), kernel.rows + iterations * (kernel.rows - 1));
+
+    EXPECT_MAT_NEAR(getInnerROI(dst_gold, ksize), getInnerROI(dst, ksize), 0.0);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Filter, Erode, testing::Combine(
+    ALL_DEVICES,
+    DIFFERENT_SIZES,
+    testing::Values(MatType(CV_8UC1), MatType(CV_8UC4)),
+    testing::Values(Anchor(cv::Point(-1, -1)), Anchor(cv::Point(0, 0)), Anchor(cv::Point(2, 2))),
+    testing::Values(Iterations(1), Iterations(2), Iterations(3)),
+    WHOLE_SUBMAT));
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
 // Dilate
-class CV_GpuDilateTest : public CV_GpuNppFilterTest
+
+PARAM_TEST_CASE(Dilate, cv::gpu::DeviceInfo, cv::Size, MatType, Anchor, Iterations, UseRoi)
 {
-public:
-    CV_GpuDilateTest() : CV_GpuNppFilterTest( "GPU-NppDilate", "dilate" ) {} 
+    cv::gpu::DeviceInfo devInfo;
+    cv::Size size;
+    int type;
+    cv::Point anchor;
+    int iterations;
+    bool useRoi;
 
-protected:
-	virtual int test(const Mat& img)
+    virtual void SetUp()
     {
-        Mat kernel(Mat::ones(3, 3, CV_8U));
+        devInfo = GET_PARAM(0);
+        size = GET_PARAM(1);
+        type = GET_PARAM(2);
+        anchor = GET_PARAM(3);
+        iterations = GET_PARAM(4);
+        useRoi = GET_PARAM(5);
 
-	    cv::Mat cpuRes;
-        cv::dilate(img, cpuRes, kernel);
-
-	    GpuMat gpuRes;
-        cv::gpu::dilate(GpuMat(img), gpuRes, kernel);
-	
-	    return CheckNorm(cpuRes, gpuRes, Size(3, 3));
+        cv::gpu::setDevice(devInfo.deviceID());
     }
 };
 
-////////////////////////////////////////////////////////////////////////////////
-// MorphologyEx
-class CV_GpuMorphExTest : public CV_GpuNppFilterTest
+TEST_P(Dilate, Accuracy)
 {
-public:
-    CV_GpuMorphExTest() : CV_GpuNppFilterTest( "GPU-NppMorphologyEx", "morphologyEx" ) {} 
+    cv::Mat src = randomMat(size, type);
+    cv::Mat kernel = cv::Mat::ones(3, 3, CV_8U);
 
-protected:
-	virtual int test(const Mat& img)
+    cv::gpu::GpuMat dst = createMat(size, type, useRoi);
+    cv::gpu::dilate(loadMat(src, useRoi), dst, kernel, anchor, iterations);
+
+    cv::Mat dst_gold;
+    cv::dilate(src, dst_gold, kernel, anchor, iterations);
+
+    cv::Size ksize = cv::Size(kernel.cols + iterations * (kernel.cols - 1), kernel.rows + iterations * (kernel.rows - 1));
+
+    EXPECT_MAT_NEAR(getInnerROI(dst_gold, ksize), getInnerROI(dst, ksize), 0.0);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Filter, Dilate, testing::Combine(
+    ALL_DEVICES,
+    DIFFERENT_SIZES,
+    testing::Values(MatType(CV_8UC1), MatType(CV_8UC4)),
+    testing::Values(Anchor(cv::Point(-1, -1)), Anchor(cv::Point(0, 0)), Anchor(cv::Point(2, 2))),
+    testing::Values(Iterations(1), Iterations(2), Iterations(3)),
+    WHOLE_SUBMAT));
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// MorphEx
+
+CV_ENUM(MorphOp, cv::MORPH_OPEN, cv::MORPH_CLOSE, cv::MORPH_GRADIENT, cv::MORPH_TOPHAT, cv::MORPH_BLACKHAT)
+#define ALL_MORPH_OPS testing::Values(MorphOp(cv::MORPH_OPEN), MorphOp(cv::MORPH_CLOSE), MorphOp(cv::MORPH_GRADIENT), MorphOp(cv::MORPH_TOPHAT), MorphOp(cv::MORPH_BLACKHAT))
+
+PARAM_TEST_CASE(MorphEx, cv::gpu::DeviceInfo, cv::Size, MatType, MorphOp, Anchor, Iterations, UseRoi)
+{
+    cv::gpu::DeviceInfo devInfo;
+    cv::Size size;
+    int type;
+    int morphOp;
+    cv::Point anchor;
+    int iterations;
+    bool useRoi;
+
+    virtual void SetUp()
     {
-        static int ops[] = { MORPH_OPEN, CV_MOP_CLOSE, CV_MOP_GRADIENT, CV_MOP_TOPHAT, CV_MOP_BLACKHAT};
-        const char *names[] = { "MORPH_OPEN", "CV_MOP_CLOSE", "CV_MOP_GRADIENT", "CV_MOP_TOPHAT", "CV_MOP_BLACKHAT"};
-        int num = sizeof(ops)/sizeof(ops[0]);
+        devInfo = GET_PARAM(0);
+        size = GET_PARAM(1);
+        type = GET_PARAM(2);
+        morphOp = GET_PARAM(3);
+        anchor = GET_PARAM(4);
+        iterations = GET_PARAM(5);
+        useRoi = GET_PARAM(6);
 
-        GpuMat kernel(Mat::ones(3, 3, CV_8U));
-
-        int res = cvtest::TS::OK;
-
-        for(int i = 0; i < num; ++i)
-        {
-            ts->printf(cvtest::TS::LOG, "Tesing %s\n", names[i]);
-
-	        cv::Mat cpuRes;
-            cv::morphologyEx(img, cpuRes, ops[i], (Mat)kernel);
-
-	        GpuMat gpuRes;
-            cv::gpu::morphologyEx(GpuMat(img), gpuRes, ops[i], kernel);
-
-            if (cvtest::TS::OK != CheckNorm(cpuRes, gpuRes, Size(4, 4)))
-                res = cvtest::TS::FAIL_GENERIC;
-        }
-        return res;
+        cv::gpu::setDevice(devInfo.deviceID());
     }
 };
 
+TEST_P(MorphEx, Accuracy)
+{
+    cv::Mat src = randomMat(size, type);
+    cv::Mat kernel = cv::Mat::ones(3, 3, CV_8U);
 
-TEST(blur, accuracy) { CV_GpuNppImageBlurTest test; test.safe_run(); }
-TEST(sobel, accuracy) { CV_GpuNppImageSobelTest test; test.safe_run(); }
-TEST(scharr, accuracy) { CV_GpuNppImageScharrTest test; test.safe_run(); }
-TEST(gaussianBlur, accuracy) { CV_GpuNppImageGaussianBlurTest test; test.safe_run(); }
-TEST(laplcaian, accuracy) { CV_GpuNppImageLaplacianTest test; test.safe_run(); }
-TEST(erode, accuracy) { CV_GpuErodeTest test; test.safe_run(); }
-TEST(dilate, accuracy) { CV_GpuDilateTest test; test.safe_run(); }
-TEST(morphEx, accuracy) { CV_GpuMorphExTest test;  test.safe_run(); }
+    cv::gpu::GpuMat dst = createMat(size, type, useRoi);
+    cv::gpu::morphologyEx(loadMat(src, useRoi), dst, morphOp, kernel, anchor, iterations);
+
+    cv::Mat dst_gold;
+    cv::morphologyEx(src, dst_gold, morphOp, kernel, anchor, iterations);
+
+    cv::Size border = cv::Size(kernel.cols + (iterations + 1) * kernel.cols + 2, kernel.rows + (iterations + 1) * kernel.rows + 2);
+
+    EXPECT_MAT_NEAR(getInnerROI(dst_gold, border), getInnerROI(dst, border), 0.0);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Filter, MorphEx, testing::Combine(
+    ALL_DEVICES,
+    DIFFERENT_SIZES,
+    testing::Values(MatType(CV_8UC1), MatType(CV_8UC4)),
+    ALL_MORPH_OPS,
+    testing::Values(Anchor(cv::Point(-1, -1)), Anchor(cv::Point(0, 0)), Anchor(cv::Point(2, 2))),
+    testing::Values(Iterations(1), Iterations(2), Iterations(3)),
+    WHOLE_SUBMAT));
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// Filter2D
+
+PARAM_TEST_CASE(Filter2D, cv::gpu::DeviceInfo, cv::Size, MatType, KSize, Anchor, BorderType, UseRoi)
+{
+    cv::gpu::DeviceInfo devInfo;
+    cv::Size size;
+    int type;
+    cv::Size ksize;
+    cv::Point anchor;
+    int borderType;
+    bool useRoi;
+
+    cv::Mat img;
+    cv::Mat kernel;
+
+    virtual void SetUp()
+    {
+        devInfo = GET_PARAM(0);
+        size = GET_PARAM(1);
+        type = GET_PARAM(2);
+        ksize = GET_PARAM(3);
+        anchor = GET_PARAM(4);
+        borderType = GET_PARAM(5);
+        useRoi = GET_PARAM(6);
+
+        cv::gpu::setDevice(devInfo.deviceID());
+    }
+};
+
+TEST_P(Filter2D, Accuracy)
+{
+    cv::Mat src = randomMat(size, type);
+    cv::Mat kernel = randomMat(cv::Size(ksize.width, ksize.height), CV_32FC1, 0.0, 1.0);
+
+    cv::gpu::GpuMat dst = createMat(size, type, useRoi);
+    cv::gpu::filter2D(loadMat(src, useRoi), dst, -1, kernel, anchor, borderType);
+
+    cv::Mat dst_gold;
+    cv::filter2D(src, dst_gold, -1, kernel, anchor, 0, borderType);
+
+    EXPECT_MAT_NEAR(dst_gold, dst, CV_MAT_DEPTH(type) == CV_32F ? 1e-1 : 1.0);
+}
+
+INSTANTIATE_TEST_CASE_P(GPU_Filter, Filter2D, testing::Combine(
+    ALL_DEVICES,
+    DIFFERENT_SIZES,
+    testing::Values(MatType(CV_8UC1), MatType(CV_8UC4), MatType(CV_16UC1), MatType(CV_16UC4), MatType(CV_32FC1), MatType(CV_32FC4)),
+    testing::Values(KSize(cv::Size(3, 3)), KSize(cv::Size(5, 5)), KSize(cv::Size(7, 7)), KSize(cv::Size(11, 11)), KSize(cv::Size(13, 13)), KSize(cv::Size(15, 15))),
+    testing::Values(Anchor(cv::Point(-1, -1)), Anchor(cv::Point(0, 0)), Anchor(cv::Point(2, 2))),
+    testing::Values(BorderType(cv::BORDER_REFLECT101), BorderType(cv::BORDER_REPLICATE), BorderType(cv::BORDER_CONSTANT), BorderType(cv::BORDER_REFLECT)),
+    WHOLE_SUBMAT));
+
+} // namespace

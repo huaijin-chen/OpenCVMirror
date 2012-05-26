@@ -6,78 +6,72 @@ Common Interfaces of Feature Detectors
 Feature detectors in OpenCV have wrappers with a common interface that enables you to easily switch
 between different algorithms solving the same problem. All objects that implement keypoint detectors
 inherit the
-:ref:`FeatureDetector` interface.
-
-.. index:: KeyPoint
-
-.. KeyPoint:
+:ocv:class:`FeatureDetector` interface.
 
 KeyPoint
 --------
-.. cpp:class:: KeyPoint
+.. ocv:class:: KeyPoint
 
-Data structure for salient point detectors ::
+Data structure for salient point detectors.
 
-    class KeyPoint
-    {
-    public:
-        // the default constructor
-        KeyPoint() : pt(0,0), size(0), angle(-1), response(0), octave(0),
-                     class_id(-1) {}
-        // the full constructor
-        KeyPoint(Point2f _pt, float _size, float _angle=-1,
-                float _response=0, int _octave=0, int _class_id=-1)
-                : pt(_pt), size(_size), angle(_angle), response(_response),
-                  octave(_octave), class_id(_class_id) {}
-        // another form of the full constructor
-        KeyPoint(float x, float y, float _size, float _angle=-1,
-                float _response=0, int _octave=0, int _class_id=-1)
-                : pt(x, y), size(_size), angle(_angle), response(_response),
-                  octave(_octave), class_id(_class_id) {}
-        // converts vector of keypoints to vector of points
-        static void convert(const std::vector<KeyPoint>& keypoints,
-                            std::vector<Point2f>& points2f,
-                            const std::vector<int>& keypointIndexes=std::vector<int>());
-        // converts vector of points to the vector of keypoints, where each
-        // keypoint is assigned to the same size and the same orientation
-        static void convert(const std::vector<Point2f>& points2f,
-                            std::vector<KeyPoint>& keypoints,
-                            float size=1, float response=1, int octave=0,
-                            int class_id=-1);
+    .. ocv:member:: Point2f pt
 
-        // computes overlap for pair of keypoints;
-        // overlap is a ratio between area of keypoint regions intersection and
-        // area of keypoint regions union (now keypoint region is a circle)
-        static float overlap(const KeyPoint& kp1, const KeyPoint& kp2);
+        coordinates of the keypoint
 
-        Point2f pt; // coordinates of the keypoints
-        float size; // diameter of the meaningful keypoint neighborhood
-        float angle; // computed orientation of the keypoint (-1 if not applicable)
-        float response; // the response by which the most strong keypoints
-                        // have been selected. Can be used for further sorting
-                        // or subsampling
-        int octave; // octave (pyramid layer) from which the keypoint has been extracted
-        int class_id; // object class (if the keypoints need to be clustered by
-                      // an object they belong to)
-    };
+    .. ocv:member:: float size
 
-    // writes vector of keypoints to the file storage
-    void write(FileStorage& fs, const string& name, const vector<KeyPoint>& keypoints);
-    // reads vector of keypoints from the specified file storage node
-    void read(const FileNode& node, CV_OUT vector<KeyPoint>& keypoints);
+         diameter of the meaningful keypoint neighborhood
 
-..
+    .. ocv:member:: float angle
 
+        computed orientation of the keypoint (-1 if not applicable)
 
-.. index:: FeatureDetector
+    .. ocv:member:: float response
 
-.. _FeatureDetector:
+        the response by which the most strong keypoints have been selected. Can be used for further sorting or subsampling
+
+    .. ocv:member:: int octave
+
+        octave (pyramid layer) from which the keypoint has been extracted
+
+    .. ocv:member:: int class_id
+
+        object id that can be used to clustered keypoints by an object they belong to
+
+KeyPoint::KeyPoint
+------------------
+The keypoint constructors
+
+.. ocv:function:: KeyPoint::KeyPoint()
+
+.. ocv:function:: KeyPoint::KeyPoint(Point2f _pt, float _size, float _angle=-1, float _response=0, int _octave=0, int _class_id=-1)
+
+.. ocv:function:: KeyPoint::KeyPoint(float x, float y, float _size, float _angle=-1, float _response=0, int _octave=0, int _class_id=-1)
+
+.. ocv:pyfunction:: cv2.KeyPoint(x, y, _size[, _angle[, _response[, _octave[, _class_id]]]]) -> <KeyPoint object>
+
+    :param x: x-coordinate of the keypoint
+
+    :param y: y-coordinate of the keypoint
+
+    :param _pt: x & y coordinates of the keypoint
+
+    :param _size: keypoint diameter
+
+    :param _angle: keypoint orientation
+
+    :param _response: keypoint detector response on the keypoint (that is, strength of the keypoint)
+
+    :param _octave: pyramid octave in which the keypoint has been detected
+
+    :param _class_id: object id
+
 
 FeatureDetector
 ---------------
-.. cpp:class:: FeatureDetector
+.. ocv:class:: FeatureDetector
 
-Abstract base class for 2D image feature detectors ::
+Abstract base class for 2D image feature detectors. ::
 
     class CV_EXPORTS FeatureDetector
     {
@@ -100,85 +94,72 @@ Abstract base class for 2D image feature detectors ::
     ...
     };
 
-
-.. index:: FeatureDetector::detect
-
 FeatureDetector::detect
 ---------------------------
-.. cpp:function:: void FeatureDetector::detect( const Mat& image,                                vector<KeyPoint>& keypoints,                                 const Mat& mask=Mat() ) const
+Detects keypoints in an image (first variant) or image set (second variant).
 
-    Detects keypoints in an image (first variant) or image set (second variant).
+.. ocv:function:: void FeatureDetector::detect( const Mat& image, vector<KeyPoint>& keypoints, const Mat& mask=Mat() ) const
+
+.. ocv:function:: void FeatureDetector::detect( const vector<Mat>& images, vector<vector<KeyPoint> >& keypoints, const vector<Mat>& masks=vector<Mat>() ) const
 
     :param image: Image.
 
-    :param keypoints: Detected keypoints.
-
-    :param mask: Mask specifying where to look for keypoints (optional). It must be a char matrix with non-zero values in the region of interest.
-
-.. cpp:function:: void FeatureDetector::detect( const vector<Mat>& images,                                                            vector<vector<KeyPoint> >& keypoints,                                                             const vector<Mat>& masks=vector<Mat>() ) const
-
     :param images: Image set.
 
-    :param keypoints: Collection of keypoints detected in input images. ``keypoints[i]`` is a set of keypoints detected in ``images[i]`` .
+    :param keypoints: The detected keypoints. In the second variant of the method ``keypoints[i]`` is a set of keypoints detected in ``images[i]`` .
 
-    :param masks: Masks for each input image specifying where to look for keypoints (optional). ``masks[i]`` is a mask for ``images[i]`` .                     Each element of the ``masks``  vector must be a char matrix with non-zero values in the region of interest.
+    :param mask: Mask specifying where to look for keypoints (optional). It must be a 8-bit integer matrix with non-zero values in the region of interest.
 
-.. index:: FeatureDetector::read
+    :param masks: Masks for each input image specifying where to look for keypoints (optional). ``masks[i]`` is a mask for ``images[i]``.
 
 FeatureDetector::read
 -------------------------
-.. cpp:function:: void FeatureDetector::read( const FileNode& fn )
+Reads a feature detector object from a file node.
 
-    Reads a feature detector object from a file node.
+.. ocv:function:: void FeatureDetector::read( const FileNode& fn )
 
     :param fn: File node from which the detector is read.
 
-.. index:: FeatureDetector::write
-
 FeatureDetector::write
 --------------------------
-.. cpp:function:: void FeatureDetector::write( FileStorage& fs ) const
+Writes a feature detector object to a file storage.
 
-    Writes a feature detector object to a file storage.
+.. ocv:function:: void FeatureDetector::write( FileStorage& fs ) const
 
     :param fs: File storage where the detector is written.
 
-.. index:: FeatureDetector::create
-
 FeatureDetector::create
 ---------------------------
-.. cpp:function:: Ptr<FeatureDetector> FeatureDetector::create( const string& detectorType )
+Creates a feature detector by its name.
 
-    Creates a feature detector by its name.
+.. ocv:function:: Ptr<FeatureDetector> FeatureDetector::create( const string& detectorType )
 
     :param detectorType: Feature detector type.
 
 The following detector types are supported:
 
-* ``"FAST"`` -- :ref:`FastFeatureDetector`
-* ``"STAR"`` -- :ref:`StarFeatureDetector`
-* ``"SIFT"`` -- :ref:`SiftFeatureDetector`
-* ``"SURF"`` -- :ref:`SurfFeatureDetector`
-* ``"ORB"`` -- :ref:`OrbFeatureDetector`
-* ``"MSER"`` -- :ref:`MserFeatureDetector`
-* ``"GFTT"`` -- :ref:`GfttFeatureDetector`
-* ``"HARRIS"`` -- :ref:`HarrisFeatureDetector`
+* ``"FAST"`` -- :ocv:class:`FastFeatureDetector`
+* ``"STAR"`` -- :ocv:class:`StarFeatureDetector`
+* ``"SIFT"`` -- :ocv:class:`SIFT` (nonfree module)
+* ``"SURF"`` -- :ocv:class:`SURF` (nonfree module)
+* ``"ORB"`` -- :ocv:class:`ORB`
+* ``"MSER"`` -- :ocv:class:`MSER`
+* ``"GFTT"`` -- :ocv:class:`GoodFeaturesToTrackDetector`
+* ``"HARRIS"`` -- :ocv:class:`GoodFeaturesToTrackDetector` with Harris detector enabled
+* ``"Dense"`` -- :ocv:class:`DenseFeatureDetector`
+* ``"SimpleBlob"`` -- :ocv:class:`SimpleBlobDetector`
 
 Also a combined format is supported: feature detector adapter name ( ``"Grid"`` --
-:ref:`GridAdaptedFeatureDetector`, ``"Pyramid"`` --
-:ref:`PyramidAdaptedFeatureDetector` ) + feature detector name (see above),
+:ocv:class:`GridAdaptedFeatureDetector`, ``"Pyramid"`` --
+:ocv:class:`PyramidAdaptedFeatureDetector` ) + feature detector name (see above),
 for example: ``"GridFAST"``, ``"PyramidSTAR"`` .
-
-.. index:: FastFeatureDetector
-
-.. _FastFeatureDetector:
 
 FastFeatureDetector
 -------------------
-.. cpp:class:: FastFeatureDetector
+.. ocv:class:: FastFeatureDetector
 
 Wrapping class for feature detection using the
-:ref:`FAST` method ::
+:ocv:func:`FAST` method. ::
 
     class FastFeatureDetector : public FeatureDetector
     {
@@ -190,17 +171,12 @@ Wrapping class for feature detection using the
         ...
     };
 
-
-.. index:: GoodFeaturesToTrackDetector
-
-.. _GoodFeaturesToTrackDetector:
-
 GoodFeaturesToTrackDetector
 ---------------------------
-.. cpp:class:: GoodFeaturesToTrackDetector
+.. ocv:class:: GoodFeaturesToTrackDetector
 
 Wrapping class for feature detection using the
-:ref:`goodFeaturesToTrack` function ::
+:ocv:func:`goodFeaturesToTrack` function. ::
 
     class GoodFeaturesToTrackDetector : public FeatureDetector
     {
@@ -233,17 +209,12 @@ Wrapping class for feature detection using the
         ...
     };
 
-
-.. index:: MserFeatureDetector
-
-.. _MserFeatureDetector:
-
 MserFeatureDetector
 -------------------
-.. cpp:class:: MserFeatureDetector
+.. ocv:class:: MserFeatureDetector
 
 Wrapping class for feature detection using the
-:ref:`MSER` class ::
+:ocv:class:`MSER` class. ::
 
     class MserFeatureDetector : public FeatureDetector
     {
@@ -260,16 +231,12 @@ Wrapping class for feature detection using the
     };
 
 
-.. index:: StarFeatureDetector
-
-.. _StarFeatureDetector:
-
 StarFeatureDetector
 -------------------
-.. cpp:class:: StarFeatureDetector
+.. ocv:class:: StarFeatureDetector
 
 Wrapping class for feature detection using the
-:ref:`StarDetector` class ::
+:ocv:class:`StarDetector` class. ::
 
     class StarFeatureDetector : public FeatureDetector
     {
@@ -283,90 +250,38 @@ Wrapping class for feature detection using the
         ...
     };
 
+DenseFeatureDetector
+--------------------
+.. ocv:class:: DenseFeatureDetector
 
-.. index:: SiftFeatureDetector
+Class for generation of image features which are distributed densely and regularly over the image. ::
 
-.. _SiftFeatureDetector:
-
-SiftFeatureDetector
--------------------
-.. cpp:class:: SiftFeatureDetector
-
-Wrapping class for feature detection using the
-:ref:`SIFT` class ::
-
-    class SiftFeatureDetector : public FeatureDetector
-    {
-    public:
-        SiftFeatureDetector(
-            const SIFT::DetectorParams& detectorParams=SIFT::DetectorParams(),
-            const SIFT::CommonParams& commonParams=SIFT::CommonParams() );
-        SiftFeatureDetector( double threshold, double edgeThreshold,
-                             int nOctaves=SIFT::CommonParams::DEFAULT_NOCTAVES,
-                             int nOctaveLayers=SIFT::CommonParams::DEFAULT_NOCTAVE_LAYERS,
-                             int firstOctave=SIFT::CommonParams::DEFAULT_FIRST_OCTAVE,
-                             int angleMode=SIFT::CommonParams::FIRST_ANGLE );
-        virtual void read( const FileNode& fn );
-        virtual void write( FileStorage& fs ) const;
-    protected:
+        class DenseFeatureDetector : public FeatureDetector
+        {
+        public:
+                DenseFeatureDetector( float initFeatureScale=1.f, int featureScaleLevels=1,
+                              float featureScaleMul=0.1f,
+                              int initXyStep=6, int initImgBound=0,
+                              bool varyXyStepWithScale=true,
+                              bool varyImgBoundWithScale=false );
+        protected:
         ...
     };
 
+The detector generates several levels (in the amount of ``featureScaleLevels``) of features. Features of each level are located in the nodes of a regular grid over the image (excluding the image boundary of given size). The level parameters (a feature scale, a node size, a size of boundary) are multiplied by ``featureScaleMul`` with level index growing depending on input flags, viz.:
 
-.. index:: SurfFeatureDetector
+* Feature scale is multiplied always.
 
-.. _SurfFeatureDetector:
+* The grid node size is multiplied if ``varyXyStepWithScale`` is ``true``.
 
-SurfFeatureDetector
--------------------
-.. cpp:class:: SurfFeatureDetector
+* Size of image boundary is multiplied if ``varyImgBoundWithScale`` is ``true``.
 
-Wrapping class for feature detection using the
-:ref:`SURF` class ::
-
-    class SurfFeatureDetector : public FeatureDetector
-    {
-    public:
-        SurfFeatureDetector( double hessianThreshold = 400., int octaves = 3,
-                             int octaveLayers = 4 );
-        virtual void read( const FileNode& fn );
-        virtual void write( FileStorage& fs ) const;
-    protected:
-        ...
-    };
-
-
-.. index:: OrbFeatureDetector
-
-.. _OrbFeatureDetector:
-
-OrbFeatureDetector
--------------------
-.. cpp:class:: OrbFeatureDetector
-
-Wrapping class for feature detection using the
-:ref:`ORB` class ::
-
-    class OrbFeatureDetector : public FeatureDetector
-    {
-    public:
-        OrbFeatureDetector( size_t n_features );
-        virtual void read( const FileNode& fn );
-        virtual void write( FileStorage& fs ) const;
-    protected:
-        ...
-    };
-
-
-.. index:: SimpleBlobDetector
-
-.. _SimpleBlobDetector:
 
 SimpleBlobDetector
 -------------------
-.. cpp:class:: SimpleBlobDetector
+.. ocv:class:: SimpleBlobDetector
 
-Class for extracting blobs from an image ::
+Class for extracting blobs from an image. ::
 
     class SimpleBlobDetector : public FeatureDetector
     {
@@ -402,33 +317,36 @@ Class for extracting blobs from an image ::
         ...
     };
 
-The class implements a simple algorithm for extracting blobs from an image. It converts the source image to binary images by applying thresholding with several thresholds from ``minThreshold`` (inclusive) to ``maxThreshold`` (exclusive) with distance ``thresholdStep`` between neighboring thresholds. Then connected components are extracted from every binary image by  :cpp:func:`findContours`  and their centers are calculated. Centers from several binary images are grouped by their coordinates. Close centers form one group that corresponds to one blob and this is controled by the ``minDistBetweenBlobs`` parameter. Then final centers of blobs and their radiuses are estimated from these groups and returned as locations and sizes of keypoints.
+The class implements a simple algorithm for extracting blobs from an image:
+
+#. Convert the source image to binary images by applying thresholding with several thresholds from ``minThreshold`` (inclusive) to ``maxThreshold`` (exclusive) with distance ``thresholdStep`` between neighboring thresholds.
+
+#. Extract connected components from every binary image by  :ocv:func:`findContours`  and calculate their centers.
+
+#. Group centers from several binary images by their coordinates. Close centers form one group that corresponds to one blob, which is controlled by the ``minDistBetweenBlobs`` parameter.
+
+#. From the groups, estimate final centers of blobs and their radiuses and return as locations and sizes of keypoints.
 
 This class performs several filtrations of returned blobs. You should set ``filterBy*`` to true/false to turn on/off corresponding filtration. Available filtrations:
 
- * By color. This filter compares the intensity of a binary image at the center of a blob to ``blobColor``. If they differ then the blob is filtered out. Use ``blobColor = 0`` to extract dark blobs and ``blobColor = 255`` to extract light blobs.
+ * **By color**. This filter compares the intensity of a binary image at the center of a blob to ``blobColor``. If they differ, the blob is filtered out. Use ``blobColor = 0`` to extract dark blobs and ``blobColor = 255`` to extract light blobs.
 
- * By area. Extracted blobs will have area between ``minArea`` (inclusive) and ``maxArea`` (exclusive).
+ * **By area**. Extracted blobs have an area between ``minArea`` (inclusive) and ``maxArea`` (exclusive).
 
- * By circularity. Extracted blobs will have circularity (:math:`\frac{4*\pi*Area}{perimeter * perimeter}`) between ``minCircularity`` (inclusive) and ``maxCircularity`` (exclusive).
+ * **By circularity**. Extracted blobs have circularity (:math:`\frac{4*\pi*Area}{perimeter * perimeter}`) between ``minCircularity`` (inclusive) and ``maxCircularity`` (exclusive).
 
- * By ratio of the minimum inertia to maximum inertia. Extracted blobs will have this ratio between ``minInertiaRatio`` (inclusive) and ``maxInertiaRatio`` (exclusive).
+ * **By ratio of the minimum inertia to maximum inertia**. Extracted blobs have this ratio between ``minInertiaRatio`` (inclusive) and ``maxInertiaRatio`` (exclusive).
 
- * By convexity. Extracted blobs will have convexity (area / area of blob convex hull) between ``minConvexity`` (inclusive) and ``maxConvexity`` (exclusive).
+ * **By convexity**. Extracted blobs have convexity (area / area of blob convex hull) between ``minConvexity`` (inclusive) and ``maxConvexity`` (exclusive).
 
 
 Default values of parameters are tuned to extract dark circular blobs.
 
-
-.. index:: GridAdaptedFeatureDetector
-
-.. _GridAdaptedFeatureDetector:
-
 GridAdaptedFeatureDetector
 --------------------------
-.. cpp:class:: GridAdaptedFeatureDetector
+.. ocv:class:: GridAdaptedFeatureDetector
 
-Class adapting a detector to partition the source image into a grid and detect points in each cell ::
+Class adapting a detector to partition the source image into a grid and detect points in each cell. ::
 
     class GridAdaptedFeatureDetector : public FeatureDetector
     {
@@ -449,14 +367,9 @@ Class adapting a detector to partition the source image into a grid and detect p
         ...
     };
 
-
-.. index:: PyramidAdaptedFeatureDetector
-
-.. _PyramidAdaptedFeatureDetector:
-
 PyramidAdaptedFeatureDetector
 -----------------------------
-.. cpp:class:: PyramidAdaptedFeatureDetector
+.. ocv:class:: PyramidAdaptedFeatureDetector
 
 Class adapting a detector to detect points over multiple levels of a Gaussian pyramid. Consider using this class for detectors that are not inherently scaled. ::
 
@@ -472,14 +385,11 @@ Class adapting a detector to detect points over multiple levels of a Gaussian py
     };
 
 
-.. index:: DynamicAdaptedFeatureDetector
-
 DynamicAdaptedFeatureDetector
 -----------------------------
+.. ocv:class:: DynamicAdaptedFeatureDetector
 
-.. cpp:class:: DynamicAdaptedFeatureDetector
-
-Adaptively adjusting detector that iteratively detects features until the desired number is found ::
+Adaptively adjusting detector that iteratively detects features until the desired number is found. ::
 
        class DynamicAdaptedFeatureDetector: public FeatureDetector
        {
@@ -494,10 +404,10 @@ used for the last detection. In this case, the detector may be used for consiste
 of keypoints in a set of temporally related images, such as video streams or
 panorama series.
 
-``DynamicAdaptedFeatureDetector``  uses another detector such as FAST or SURF to do the dirty work,
+``DynamicAdaptedFeatureDetector``  uses another detector, such as FAST or SURF, to do the dirty work,
 with the help of ``AdjusterAdapter`` .
 If the detected number of features is not large enough,
-``AdjusterAdapter`` adjusts the detection parameters so that the next detection 
+``AdjusterAdapter`` adjusts the detection parameters so that the next detection
 results in a bigger or smaller number of features.  This is repeated until either the number of desired features are found
 or the parameters are maxed out.
 
@@ -517,55 +427,48 @@ Example of creating ``DynamicAdaptedFeatureDetector`` : ::
                                   new FastAdjuster(20,true)));
 
 
-
-.. index:: DynamicAdaptedFeatureDetector::DynamicAdaptedFeatureDetector
-
 DynamicAdaptedFeatureDetector::DynamicAdaptedFeatureDetector
 ----------------------------------------------------------------
-.. cpp:function:: DynamicAdaptedFeatureDetector::DynamicAdaptedFeatureDetector(       const Ptr<AdjusterAdapter>& adjuster,       int min_features,   int max_features,   int max_iters )
+The constructor
 
-    Constructs the class.
+.. ocv:function:: DynamicAdaptedFeatureDetector::DynamicAdaptedFeatureDetector(       const Ptr<AdjusterAdapter>& adjuster,       int min_features,   int max_features,   int max_iters )
 
-    :param adjuster:  :ref:`AdjusterAdapter`  that detects features and adjusts parameters.
+    :param adjuster:  :ocv:class:`AdjusterAdapter`  that detects features and adjusts parameters.
 
     :param min_features: Minimum desired number of features.
 
     :param max_features: Maximum desired number of features.
 
-    :param max_iters: Maximum number of times to try adjusting the feature detector parameters. For :ref:`FastAdjuster` , this number can be high, but with ``Star`` or ``Surf``  many iterations can be time-comsuming.  At each iteration the detector is rerun. 
-
-.. index:: AdjusterAdapter
+    :param max_iters: Maximum number of times to try adjusting the feature detector parameters. For :ocv:class:`FastAdjuster` , this number can be high, but with ``Star`` or ``Surf``  many iterations can be time-consuming.  At each iteration the detector is rerun.
 
 AdjusterAdapter
 ---------------
+.. ocv:class:: AdjusterAdapter
 
-.. cpp:class:: AdjusterAdapter
+Class providing an interface for adjusting parameters of a feature detector. This interface is used by :ocv:class:`DynamicAdaptedFeatureDetector` . It is a wrapper for :ocv:class:`FeatureDetector` that enables adjusting parameters after feature detection. ::
 
-Class providing an interface for adjusting parameters of a feature detector. This interface is used by :ref:`DynamicAdaptedFeatureDetector` . It is a wrapper for :ref:`FeatureDetector` that enables adjusting parameters after feature detection. ::
-  
      class AdjusterAdapter: public FeatureDetector
      {
      public:
-         virtual ~AdjusterAdapter() {}
-         virtual void tooFew(int min, int n_detected) = 0;
-         virtual void tooMany(int max, int n_detected) = 0;
-         virtual bool good() const = 0;
+        virtual ~AdjusterAdapter() {}
+        virtual void tooFew(int min, int n_detected) = 0;
+        virtual void tooMany(int max, int n_detected) = 0;
+        virtual bool good() const = 0;
+        virtual Ptr<AdjusterAdapter> clone() const = 0;
+        static Ptr<AdjusterAdapter> create( const string& detectorType );
      };
 
 
 See
-:ref:`FastAdjuster`,
-:ref:`StarAdjuster`,
-:ref:`SurfAdjuster` for concrete implementations.
-
-
-.. index:: AdjusterAdapter::tooFew
+:ocv:class:`FastAdjuster`,
+:ocv:class:`StarAdjuster`, and
+:ocv:class:`SurfAdjuster` for concrete implementations.
 
 AdjusterAdapter::tooFew
 ---------------------------
-.. cpp:function:: void AdjusterAdapter::tooFew(int min, int n_detected)
+Adjusts the detector parameters to detect more features.
 
-    Adjusts the detector parameters to detect more features.
+.. ocv:function:: void AdjusterAdapter::tooFew(int min, int n_detected)
 
     :param min: Minimum desired number of features.
 
@@ -578,14 +481,11 @@ Example: ::
             thresh_--;
     }
 
-
-.. index:: AdjusterAdapter::tooMany
-
 AdjusterAdapter::tooMany
 ----------------------------
-.. cpp:function:: void AdjusterAdapter::tooMany(int max, int n_detected)
+Adjusts the detector parameters to detect less features.
 
-    Adjusts the detector parameters to detect less features.
+.. ocv:function:: void AdjusterAdapter::tooMany(int max, int n_detected)
 
     :param max: Maximum desired number of features.
 
@@ -599,13 +499,11 @@ Example: ::
     }
 
 
-.. index:: AdjusterAdapter::good
-
 AdjusterAdapter::good
 -------------------------
-.. cpp:function:: bool AdjusterAdapter::good() const
+Returns false if the detector parameters cannot be adjusted any more.
 
-    Returns false if the detector parameters cannot be adjusted any more. 
+.. ocv:function:: bool AdjusterAdapter::good() const
 
 Example: ::
 
@@ -614,15 +512,19 @@ Example: ::
                 return (thresh_ > 1) && (thresh_ < 200);
         }
 
+AdjusterAdapter::create
+-------------------------
+Creates an adjuster adapter by name
 
-.. index:: FastAdjuster
+.. ocv:function:: Ptr<AdjusterAdapter> AdjusterAdapter::create( const string& detectorType )
+
+    Creates an adjuster adapter by name ``detectorType``. The detector name is the same as in :ocv:func:`FeatureDetector::create`, but now supports ``"FAST"``, ``"STAR"``, and ``"SURF"`` only.
 
 FastAdjuster
 ------------
+.. ocv:class:: FastAdjuster
 
-.. cpp:class:: FastAdjuster
-
-:ref:`AdjusterAdapter` for :ref:`FastFeatureDetector`. This class decreases or increases the threshold value by 1. ::
+:ocv:class:`AdjusterAdapter` for :ocv:class:`FastFeatureDetector`. This class decreases or increases the threshold value by 1. ::
 
         class FastAdjuster FastAdjuster: public AdjusterAdapter
         {
@@ -631,61 +533,14 @@ FastAdjuster
                 ...
         };
 
-.. index:: StarAdjuster
-
 StarAdjuster
 ------------
+.. ocv:class:: StarAdjuster
 
-.. cpp:class:: StarAdjuster
-
-:ref:`AdjusterAdapter` for :ref:`StarFeatureDetector`. This class adjusts the ``responseThreshhold`` of ``StarFeatureDetector``.  ::
+:ocv:class:`AdjusterAdapter` for :ocv:class:`StarFeatureDetector`. This class adjusts the ``responseThreshhold`` of ``StarFeatureDetector``.  ::
 
         class StarAdjuster: public AdjusterAdapter
         {
                 StarAdjuster(double initial_thresh = 30.0);
                 ...
         };
-
-.. index:: SurfAdjuster
-
-SurfAdjuster
-------------
-
-.. cpp:class:: SurfAdjuster
-
-:ref:`AdjusterAdapter` for :ref:`SurfFeatureDetector`. This class adjusts the ``hessianThreshold`` of ``SurfFeatureDetector``. ::
-
-        class SurfAdjuster: public SurfAdjuster
-        {
-                SurfAdjuster();
-                ...
-        };
-
-.. index:: FeatureDetector
-
-FeatureDetector
----------------
-.. cpp:class:: FeatureDetector
-
-Abstract base class for 2D image feature detectors ::
-
-    class CV_EXPORTS FeatureDetector
-    {
-    public:
-        virtual ~FeatureDetector();
-
-        void detect( const Mat& image, vector<KeyPoint>& keypoints,
-                     const Mat& mask=Mat() ) const;
-
-        void detect( const vector<Mat>& images,
-                     vector<vector<KeyPoint> >& keypoints,
-                     const vector<Mat>& masks=vector<Mat>() ) const;
-
-        virtual void read(const FileNode&);
-        virtual void write(FileStorage&) const;
-
-        static Ptr<FeatureDetector> create( const string& detectorType );
-
-    protected:
-    ...
-    };

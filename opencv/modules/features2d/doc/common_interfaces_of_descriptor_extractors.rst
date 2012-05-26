@@ -5,17 +5,17 @@ Common Interfaces of Descriptor Extractors
 
 Extractors of keypoint descriptors in OpenCV have wrappers with a common interface that enables you to easily switch
 between different algorithms solving the same problem. This section is devoted to computing descriptors
-that are represented as vectors in a multidimensional space. All objects that implement the ``vector``
+represented as vectors in a multidimensional space. All objects that implement the ``vector``
 descriptor extractors inherit the
-:ref:`DescriptorExtractor` interface.
+:ocv:class:`DescriptorExtractor` interface.
 
-.. index:: DescriptorExtractor
+
 
 DescriptorExtractor
 -------------------
-.. cpp:class:: DescriptorExtractor
+.. ocv:class:: DescriptorExtractor
 
-Abstract base class for computing descriptors for image keypoints ::
+Abstract base class for computing descriptors for image keypoints. ::
 
     class CV_EXPORTS DescriptorExtractor
     {
@@ -45,188 +45,69 @@ dense, fixed-dimension vector of a basic type. Most descriptors
 follow this pattern as it simplifies computing
 distances between descriptors. Therefore, a collection of
 descriptors is represented as
-:ref:`Mat` , where each row is a keypoint descriptor.
+:ocv:class:`Mat` , where each row is a keypoint descriptor.
 
-.. index:: DescriptorExtractor::compute
+
 
 DescriptorExtractor::compute
 --------------------------------
-.. cpp:function:: void DescriptorExtractor::compute( const Mat& image, vector<KeyPoint>& keypoints, Mat& descriptors ) const
+Computes the descriptors for a set of keypoints detected in an image (first variant) or image set (second variant).
 
-    Computes the descriptors for a set of keypoints detected in an image (first variant) or image set (second variant).
+.. ocv:function:: void DescriptorExtractor::compute( const Mat& image, vector<KeyPoint>& keypoints, Mat& descriptors ) const
+
+.. ocv:function:: void DescriptorExtractor::compute( const vector<Mat>& images, vector<vector<KeyPoint> >& keypoints, vector<Mat>& descriptors ) const
 
     :param image: Image.
 
-    :param keypoints: Keypoints. Keypoints for which a descriptor cannot be computed are removed.
-
-    :param descriptors: Descriptors. Row i is the descriptor for keypoint i.
-
-.. cpp:function:: void DescriptorExtractor::compute( const vector<Mat>& images, vector<vector<KeyPoint> >& keypoints, vector<Mat>& descriptors ) const
-
     :param images: Image set.
 
-    :param keypoints: Input keypoints collection. ``keypoints[i]`` are keypoints
-                          detected in ``images[i]`` . Keypoints for which a descriptor
-                          cannot be computed are removed.
+    :param keypoints: Input collection of keypoints. Keypoints for which a descriptor cannot be computed are removed. Sometimes new keypoints can be added, for example: ``SIFT`` duplicates keypoint with several dominant orientations (for each orientation).
 
-    :param descriptors: Descriptor collection. ``descriptors[i]`` are descriptors computed for a ``keypoints[i]`` set.
-
-.. index:: DescriptorExtractor::read
+    :param descriptors: Computed descriptors. In the second variant of the method ``descriptors[i]`` are descriptors computed for a ``keypoints[i]`. Row ``j`` is the ``keypoints`` (or ``keypoints[i]``) is the descriptor for keypoint ``j``-th keypoint.
 
 DescriptorExtractor::read
 -----------------------------
-.. cpp:function:: void DescriptorExtractor::read( const FileNode& fn )
+Reads the object of a descriptor extractor from a file node.
 
-    Reads the object of a descriptor extractor from a file node.
+.. ocv:function:: void DescriptorExtractor::read( const FileNode& fn )
 
     :param fn: File node from which the detector is read.
 
-.. index:: DescriptorExtractor::write
+
 
 DescriptorExtractor::write
 ------------------------------
-.. cpp:function:: void DescriptorExtractor::write( FileStorage& fs ) const
+Writes the object of a descriptor extractor to a file storage.
 
-    Writes the object of a descriptor extractor to a file storage.
+.. ocv:function:: void DescriptorExtractor::write( FileStorage& fs ) const
 
     :param fs: File storage where the detector is written.
 
-.. index:: DescriptorExtractor::create
+
 
 DescriptorExtractor::create
 -------------------------------
-.. cpp:function:: Ptr<DescriptorExtractor>  DescriptorExtractor::create( const string& descriptorExtractorType )
+Creates a descriptor extractor by name.
 
-    Creates a descriptor extractor by name.
+.. ocv:function:: Ptr<DescriptorExtractor>  DescriptorExtractor::create( const string& descriptorExtractorType )
 
     :param descriptorExtractorType: Descriptor extractor type.
 
 The current implementation supports the following types of a descriptor extractor:
 
- * ``"SIFT"`` -- :ref:`SiftDescriptorExtractor`
- * ``"SURF"`` -- :ref:`SurfDescriptorExtractor`
- * ``"ORB"`` -- :ref:`OrbDescriptorExtractor`
- * ``"BRIEF"`` -- :ref:`BriefDescriptorExtractor`
+ * ``"SIFT"`` -- :ocv:class:`SIFT`
+ * ``"SURF"`` -- :ocv:class:`SURF`
+ * ``"ORB"`` -- :ocv:class:`ORB`
+ * ``"BRIEF"`` -- :ocv:class:`BriefDescriptorExtractor`
 
 A combined format is also supported: descriptor extractor adapter name ( ``"Opponent"`` --
-:ref:`OpponentColorDescriptorExtractor` ) + descriptor extractor name (see above),
+:ocv:class:`OpponentColorDescriptorExtractor` ) + descriptor extractor name (see above),
 for example: ``"OpponentSIFT"`` .
 
-.. index:: SiftDescriptorExtractor
-
-.. _SiftDescriptorExtractor:
-
-SiftDescriptorExtractor
------------------------
-.. cpp:class:: SiftDescriptorExtractor
-
-Wrapping class for computing descriptors by using the
-:ref:`SIFT` class ::
-
-    class SiftDescriptorExtractor : public DescriptorExtractor
-    {
-    public:
-        SiftDescriptorExtractor(
-            const SIFT::DescriptorParams& descriptorParams=SIFT::DescriptorParams(),
-            const SIFT::CommonParams& commonParams=SIFT::CommonParams() );
-        SiftDescriptorExtractor( double magnification, bool isNormalize=true,
-            bool recalculateAngles=true, int nOctaves=SIFT::CommonParams::DEFAULT_NOCTAVES,
-            int nOctaveLayers=SIFT::CommonParams::DEFAULT_NOCTAVE_LAYERS,
-            int firstOctave=SIFT::CommonParams::DEFAULT_FIRST_OCTAVE,
-            int angleMode=SIFT::CommonParams::FIRST_ANGLE );
-
-        virtual void read (const FileNode &fn);
-        virtual void write (FileStorage &fs) const;
-        virtual int descriptorSize() const;
-        virtual int descriptorType() const;
-    protected:
-        ...
-    }
-
-
-.. index:: SurfDescriptorExtractor
-
-.. _SurfDescriptorExtractor:
-
-SurfDescriptorExtractor
------------------------
-.. cpp:class:: SurfDescriptorExtractor
-
-Wrapping class for computing descriptors by using the
-:ref:`SURF` class ::
-
-    class SurfDescriptorExtractor : public DescriptorExtractor
-    {
-    public:
-        SurfDescriptorExtractor( int nOctaves=4,
-                                 int nOctaveLayers=2, bool extended=false );
-
-        virtual void read (const FileNode &fn);
-        virtual void write (FileStorage &fs) const;
-        virtual int descriptorSize() const;
-        virtual int descriptorType() const;
-    protected:
-        ...
-    }
-
-
-.. index:: OrbDescriptorExtractor
-
-.. _OrbDescriptorExtractor:
-
-OrbDescriptorExtractor
----------------------------
-.. cpp:class:: OrbDescriptorExtractor
-
-Wrapping class for computing descriptors by using the
-:ref:`ORB` class ::
-
-    template<typename T>
-    class ORbDescriptorExtractor : public DescriptorExtractor
-    {
-    public:
-        OrbDescriptorExtractor( ORB::PatchSize patch_size );
-
-        virtual void read( const FileNode &fn );
-        virtual void write( FileStorage &fs ) const;
-        virtual int descriptorSize() const;
-        virtual int descriptorType() const;
-    protected:
-        ...
-    }
-
-
-.. index:: CalonderDescriptorExtractor
-
-CalonderDescriptorExtractor
----------------------------
-.. cpp:class:: CalonderDescriptorExtractor
-
-Wrapping class for computing descriptors by using the
-:ref:`RTreeClassifier` class ::
-
-    template<typename T>
-    class CalonderDescriptorExtractor : public DescriptorExtractor
-    {
-    public:
-        CalonderDescriptorExtractor( const string& classifierFile );
-
-        virtual void read( const FileNode &fn );
-        virtual void write( FileStorage &fs ) const;
-        virtual int descriptorSize() const;
-        virtual int descriptorType() const;
-    protected:
-        ...
-    }
-
-
-.. index:: OpponentColorDescriptorExtractor
-
-.. _OpponentColorDescriptorExtractor:
 
 OpponentColorDescriptorExtractor
 --------------------------------
-.. cpp:class:: OpponentColorDescriptorExtractor
+.. ocv:class:: OpponentColorDescriptorExtractor
 
 Class adapting a descriptor extractor to compute descriptors in the Opponent Color Space
 (refer to Van de Sande et al., CGIV 2008 *Color Descriptors for Object Category Recognition*).
@@ -248,17 +129,14 @@ them into a single color descriptor. ::
     };
 
 
-.. index:: BriefDescriptorExtractor
-
-.. _BriefDescriptorExtractor:
 
 BriefDescriptorExtractor
 ------------------------
-.. cpp:class:: BriefDescriptorExtractor
+.. ocv:class:: BriefDescriptorExtractor
 
 Class for computing BRIEF descriptors described in a paper of Calonder M., Lepetit V.,
 Strecha C., Fua P. *BRIEF: Binary Robust Independent Elementary Features* ,
-11th European Conference on Computer Vision (ECCV), Heraklion, Crete. LNCS Springer, September 2010 ::
+11th European Conference on Computer Vision (ECCV), Heraklion, Crete. LNCS Springer, September 2010. ::
 
     class BriefDescriptorExtractor : public DescriptorExtractor
     {

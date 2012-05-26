@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import cv
+import cv2.cv as cv
 
 def is_rect_nonzero(r):
     (_,_,w,h) = r
@@ -113,3 +113,4 @@ class CamShiftDemo:
 if __name__=="__main__":
     demo = CamShiftDemo()
     demo.run()
+    cv.DestroyAllWindows()

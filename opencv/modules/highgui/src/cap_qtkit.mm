@@ -733,7 +733,7 @@ IplImage* CvCaptureFile::retrieveFramePixelBuffer() {
 		image->height = height; 
 		image->nChannels = 4; 
 		image->depth = IPL_DEPTH_8U; 
-		image->widthStep = width*4; 
+		image->widthStep = rowBytes; 
 		image->imageData = imagedata; 
 		image->imageSize = currSize; 
 		
@@ -746,7 +746,7 @@ IplImage* CvCaptureFile::retrieveFramePixelBuffer() {
 		bgr_image->height = height; 
 		bgr_image->nChannels = 3; 
 		bgr_image->depth = IPL_DEPTH_8U; 
-		bgr_image->widthStep = width*4; 
+		bgr_image->widthStep = rowBytes; 
 		bgr_image->imageData = bgr_imagedata; 
 		bgr_image->imageSize = currSize; 
 		
@@ -795,6 +795,7 @@ double CvCaptureFile::getProperty(int property_id){
 	double retval; 
 	QTTime t; 
 	
+	//cerr << "get_prop"<<endl;
 	switch (property_id) {
 		case CV_CAP_PROP_POS_MSEC:
 			[[mCaptureSession attributeForKey:QTMovieCurrentTimeAttribute] getValue:&t]; 
@@ -815,6 +816,9 @@ double CvCaptureFile::getProperty(int property_id){
 		case CV_CAP_PROP_FPS:
 			retval = currentFPS;  
 			break; 
+		case CV_CAP_PROP_FRAME_COUNT:
+			retval = movieDuration*movieFPS/1000;
+			break;
 		case CV_CAP_PROP_FOURCC:
 		default:
 			retval = 0; 
@@ -859,6 +863,17 @@ bool CvCaptureFile::setProperty(int property_id, double value) {
 			break;
 		case CV_CAP_PROP_FPS:
 			//etval = currentFPS;  
+			break; 
+		case CV_CAP_PROP_FRAME_COUNT:
+			{
+			NSArray *videoTracks = [mCaptureSession tracksOfMediaType:QTMediaTypeVideo];
+			if ([videoTracks count] > 0) {
+				QTMedia *media = [[videoTracks objectAtIndex:0] media];
+				retval = [[media attributeForKey:QTMediaSampleCountAttribute] longValue];
+			} else {
+				retval = 0;
+			}
+			}
 			break; 
 		case CV_CAP_PROP_FOURCC:
 		default:

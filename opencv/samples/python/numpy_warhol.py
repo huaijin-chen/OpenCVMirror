@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import urllib2
 import sys
-import cv
+import cv2.cv as cv
 import numpy
 
 if __name__ == "__main__":
@@ -45,3 +45,4 @@ if __name__ == "__main__":
         cv.ShowImage("camera", paste)
         if cv.WaitKey(6) == 27:
             break
+    cv.DestroyAllWindows()

@@ -1,4 +1,4 @@
-import cv
+import cv2.cv as cv
 import time
 
 cv.NamedWindow("camera", 1)
@@ -10,3 +10,4 @@ while True:
     cv.ShowImage("camera", img)
     if cv.WaitKey(10) == 27:
         break
+cv.DestroyAllWindows()

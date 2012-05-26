@@ -52,9 +52,8 @@
 //      windowOut   - Location, height and width of converged CAMSHIFT window
 //      len         - If != NULL, return equivalent len
 //      width       - If != NULL, return equivalent width
-//      itersUsed   - Returns number of iterations CAMSHIFT took to converge
 //    Returns:
-//      The function itself returns the area found
+//      Number of iterations CAMSHIFT took to converge
 //    Notes:
 //F*/
 CV_IMPL int
@@ -90,6 +89,13 @@ cvMeanShift( const void* imgProb, CvRect windowIn,
         int dx, dy, nx, ny;
         double inv_m00;
         cur_rect = cv::Rect(cur_rect) & cv::Rect(0, 0, mat->cols, mat->rows);
+        if( cv::Rect(cur_rect) == cv::Rect() )
+        {
+            cur_rect.x = mat->cols/2;
+            cur_rect.y = mat->rows/2;
+        }
+        cur_rect.width = MAX(cur_rect.width, 1);
+        cur_rect.height = MAX(cur_rect.height, 1);
         
         cvGetSubRect( mat, &cur_win, cur_rect ); 
         cvMoments( &cur_win, &moments );
@@ -148,9 +154,8 @@ cvMeanShift( const void* imgProb, CvRect windowIn,
 //      len         - If != NULL, return equivalent len
 //      width       - If != NULL, return equivalent width
 //      area        - sum of all elements in result window
-//      itersUsed   - Returns number of iterations CAMSHIFT took to converge
 //    Returns:
-//      The function itself returns the area found
+//      Number of iterations CAMSHIFT took to converge
 //    Notes:
 //F*/
 CV_IMPL int

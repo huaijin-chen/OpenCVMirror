@@ -46,7 +46,6 @@ using namespace cv;
 using namespace cv::gpu;
 using namespace std;
 
-
 #if !defined (HAVE_CUDA)
 
 cv::gpu::CascadeClassifier_GPU::CascadeClassifier_GPU()  { throw_nogpu(); }
@@ -66,10 +65,7 @@ struct cv::gpu::CascadeClassifier_GPU::CascadeClassifierImpl
     CascadeClassifierImpl(const string& filename) : lastAllocatedFrameSize(-1, -1)
     {
         ncvSetDebugOutputHandler(NCVDebugOutputHandler);
-        if (ncvStat != load(filename))
-        {
-            CV_Error(CV_GpuApiCallError, "Error in GPU cacade load");
-        }
+        ncvSafeCall( load(filename) );
     }
 
 
@@ -87,7 +83,7 @@ struct cv::gpu::CascadeClassifier_GPU::CascadeClassifierImpl
         src_seg.begin = src_beg;
         src_seg.size  = src.step * src.rows;
 
-        NCVMatrixReuse<Ncv8u> d_src(src_seg, devProp.textureAlignment, src.cols, src.rows, src.step, true);
+        NCVMatrixReuse<Ncv8u> d_src(src_seg, static_cast<int>(devProp.textureAlignment), src.cols, src.rows, static_cast<int>(src.step), true);
         ncvAssertReturn(d_src.isMemReused(), NCV_ALLOCATOR_BAD_REUSE);
 
         CV_Assert(objects.rows == 1);
@@ -132,7 +128,7 @@ struct cv::gpu::CascadeClassifier_GPU::CascadeClassifierImpl
 private:
 
 
-    static void NCVDebugOutputHandler(const char* msg) { CV_Error(CV_GpuApiCallError, msg); }
+    static void NCVDebugOutputHandler(const std::string &msg) { CV_Error(CV_GpuApiCallError, msg.c_str()); }
 
 
     NCVStatus load(const string& classifierFile)
@@ -141,8 +137,8 @@ private:
         ncvAssertCUDAReturn(cudaGetDeviceProperties(&devProp, devId), NCV_CUDA_ERROR);
 
         // Load the classifier from file (assuming its size is about 1 mb) using a simple allocator
-        gpuCascadeAllocator = new NCVMemNativeAllocator(NCVMemoryTypeDevice, devProp.textureAlignment);
-        cpuCascadeAllocator = new NCVMemNativeAllocator(NCVMemoryTypeHostPinned, devProp.textureAlignment);
+        gpuCascadeAllocator = new NCVMemNativeAllocator(NCVMemoryTypeDevice, static_cast<int>(devProp.textureAlignment));
+        cpuCascadeAllocator = new NCVMemNativeAllocator(NCVMemoryTypeHostPinned, static_cast<int>(devProp.textureAlignment));
 
         ncvAssertPrintReturn(gpuCascadeAllocator->isInitialized(), "Error creating cascade GPU allocator", NCV_CUDA_ERROR);
         ncvAssertPrintReturn(cpuCascadeAllocator->isInitialized(), "Error creating cascade CPU allocator", NCV_CUDA_ERROR);
@@ -189,8 +185,8 @@ private:
         }
 
         // Calculate memory requirements and create real allocators
-        NCVMemStackAllocator gpuCounter(devProp.textureAlignment);
-        NCVMemStackAllocator cpuCounter(devProp.textureAlignment);
+        NCVMemStackAllocator gpuCounter(static_cast<int>(devProp.textureAlignment));
+        NCVMemStackAllocator cpuCounter(static_cast<int>(devProp.textureAlignment));
 
         ncvAssertPrintReturn(gpuCounter.isInitialized(), "Error creating GPU memory counter", NCV_CUDA_ERROR);
         ncvAssertPrintReturn(cpuCounter.isInitialized(), "Error creating CPU memory counter", NCV_CUDA_ERROR);
@@ -214,8 +210,8 @@ private:
         ncvAssertReturnNcvStat(ncvStat);
         ncvAssertCUDAReturn(cudaStreamSynchronize(0), NCV_CUDA_ERROR);
 
-        gpuAllocator = new NCVMemStackAllocator(NCVMemoryTypeDevice, gpuCounter.maxSize(), devProp.textureAlignment);
-        cpuAllocator = new NCVMemStackAllocator(NCVMemoryTypeHostPinned, cpuCounter.maxSize(), devProp.textureAlignment);
+        gpuAllocator = new NCVMemStackAllocator(NCVMemoryTypeDevice, gpuCounter.maxSize(), static_cast<int>(devProp.textureAlignment));
+        cpuAllocator = new NCVMemStackAllocator(NCVMemoryTypeHostPinned, cpuCounter.maxSize(), static_cast<int>(devProp.textureAlignment));
 
         ncvAssertPrintReturn(gpuAllocator->isInitialized(), "Error creating GPU memory allocator", NCV_CUDA_ERROR);
         ncvAssertPrintReturn(cpuAllocator->isInitialized(), "Error creating CPU memory allocator", NCV_CUDA_ERROR);
@@ -287,11 +283,7 @@ int cv::gpu::CascadeClassifier_GPU::detectMultiScale( const GpuMat& image, GpuMa
     }
 
     unsigned int numDetections;
-    NCVStatus ncvStat = impl->process(image, objectsBuf, (float)scaleFactor, minNeighbors, findLargestObject, visualizeInPlace, ncvMinSize, numDetections);
-    if (ncvStat != NCV_SUCCESS)
-    {
-        CV_Error(CV_GpuApiCallError, "Error in face detectioln");
-    }
+    ncvSafeCall( impl->process(image, objectsBuf, (float)scaleFactor, minNeighbors, findLargestObject, visualizeInPlace, ncvMinSize, numDetections) );
 
     return numDetections;
 }
@@ -372,7 +364,7 @@ NCVStatus loadFromXML(const std::string &filename,
     for(int s = 0; s < stagesCound; ++s) // by stages
     {
         HaarStage64 curStage;
-        curStage.setStartClassifierRootNodeOffset(haarClassifierNodes.size());
+        curStage.setStartClassifierRootNodeOffset(static_cast<Ncv32u>(haarClassifierNodes.size()));
 
         curStage.setStageThreshold(oldCascade->stage_classifier[s].threshold);
 
@@ -452,7 +444,7 @@ NCVStatus loadFromXML(const std::string &filename,
 
                 HaarFeatureDescriptor32 tmpFeatureDesc;
                 ncvStat = tmpFeatureDesc.create(haar.bNeedsTiltedII, bIsLeftNodeLeaf, bIsRightNodeLeaf,
-                    featureId, haarFeatures.size() - featureId);
+                    featureId, static_cast<Ncv32u>(haarFeatures.size()) - featureId);
                 ncvAssertReturn(NCV_SUCCESS == ncvStat, ncvStat);
                 curNode.setFeatureDesc(tmpFeatureDesc);
 
@@ -478,13 +470,13 @@ NCVStatus loadFromXML(const std::string &filename,
     }
 
     //fill in cascade stats
-    haar.NumStages = haarStages.size();
-    haar.NumClassifierRootNodes = haarClassifierNodes.size();
-    haar.NumClassifierTotalNodes = haar.NumClassifierRootNodes + h_TmpClassifierNotRootNodes.size();
-    haar.NumFeatures = haarFeatures.size();
+    haar.NumStages = static_cast<Ncv32u>(haarStages.size());
+    haar.NumClassifierRootNodes = static_cast<Ncv32u>(haarClassifierNodes.size());
+    haar.NumClassifierTotalNodes = static_cast<Ncv32u>(haar.NumClassifierRootNodes + h_TmpClassifierNotRootNodes.size());
+    haar.NumFeatures = static_cast<Ncv32u>(haarFeatures.size());
 
     //merge root and leaf nodes in one classifiers array
-    Ncv32u offsetRoot = haarClassifierNodes.size();
+    Ncv32u offsetRoot = static_cast<Ncv32u>(haarClassifierNodes.size());
     for (Ncv32u i=0; i<haarClassifierNodes.size(); i++)
     {
         HaarFeatureDescriptor32 featureDesc = haarClassifierNodes[i].getFeatureDesc();

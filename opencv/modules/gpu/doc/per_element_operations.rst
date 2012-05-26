@@ -1,155 +1,277 @@
-Per-element Operations.
+Per-element Operations
 =======================
 
 .. highlight:: cpp
 
 
 
-.. index:: gpu::add
-
 gpu::add
 ------------
-.. cpp:function:: void gpu::add(const GpuMat& src1, const GpuMat& src2, GpuMat& dst)
+Computes a matrix-matrix or matrix-scalar sum.
 
-.. cpp:function:: void gpu::add(const GpuMat& src1, const Scalar& src2, GpuMat& dst)
+.. ocv:function:: void gpu::add(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const GpuMat& mask = GpuMat(), int dtype = -1, Stream& stream = Stream::Null())
 
-    Computes a matrix-matrix or matrix-scalar sum.
+.. ocv:function:: void gpu::add(const GpuMat& src1, const Scalar& src2, GpuMat& dst, const GpuMat& mask = GpuMat(), int dtype = -1, Stream& stream = Stream::Null())
 
-    :param src1: First source matrix. ``CV_8UC1``, ``CV_8UC4``, ``CV_32SC1``, and ``CV_32FC1`` matrices are supported for now.
+    :param src1: First source matrix.
 
-    :param src2: Second source matrix or a scalar to be added to ``src1``.
+    :param src2: Second source matrix or a scalar to be added to ``src1`` . Matrix should have the same size and type as ``src1`` .
 
-    :param dst: Destination matrix with the same size and type as ``src1``.
+    :param dst: Destination matrix that has the same size and number of channels as the input array(s). The depth is defined by ``dtype`` or ``src1`` depth.
+    
+    :param mask: Optional operation mask, 8-bit single channel array, that specifies elements of the destination array to be changed.
+    
+    :param dtype: Optional depth of the output array.
 
-See Also: :cpp:func:`add`
+    :param stream: Stream for the asynchronous version.
 
-.. index:: gpu::subtract
+.. seealso:: :ocv:func:`add`
+
+
 
 gpu::subtract
 -----------------
-.. cpp:function:: void gpu::subtract(const GpuMat& src1, const GpuMat& src2, GpuMat& dst)
+Computes a matrix-matrix or matrix-scalar difference.
 
-.. cpp:function:: void gpu::subtract(const GpuMat& src1, const Scalar& src2, GpuMat& dst)
+.. ocv:function:: void gpu::subtract(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const GpuMat& mask = GpuMat(), int dtype = -1, Stream& stream = Stream::Null())
 
-    Computes a matrix-matrix or matrix-scalar difference.
+.. ocv:function:: void gpu::subtract(const GpuMat& src1, const Scalar& src2, GpuMat& dst, const GpuMat& mask = GpuMat(), int dtype = -1, Stream& stream = Stream::Null())
 
-    :param src1: First source matrix. ``CV_8UC1``, ``CV_8UC4``, ``CV_32SC1``, and ``CV_32FC1`` matrices are supported for now.
+    :param src1: First source matrix.
 
-    :param src2: Second source matrix or a scalar to be subtracted from ``src1``.
+    :param src2: Second source matrix or a scalar to be added to ``src1`` . Matrix should have the same size and type as ``src1`` .
 
-    :param dst: Destination matrix with the same size and type as ``src1``.
+    :param dst: Destination matrix that has the same size and number of channels as the input array(s). The depth is defined by ``dtype`` or ``src1`` depth.
+    
+    :param mask: Optional operation mask, 8-bit single channel array, that specifies elements of the destination array to be changed.
+    
+    :param dtype: Optional depth of the output array.
 
-See Also: :cpp:func:`subtract`
+    :param stream: Stream for the asynchronous version.
+
+.. seealso:: :ocv:func:`subtract`
 
 
-
-.. index:: gpu::multiply
 
 gpu::multiply
 -----------------
-.. cpp:function:: void gpu::multiply(const GpuMat& src1, const GpuMat& src2, GpuMat& dst)
+Computes a matrix-matrix or matrix-scalar per-element product.
 
-.. cpp:function:: void gpu::multiply(const GpuMat& src1, const Scalar& src2, GpuMat& dst)
+.. ocv:function:: void gpu::multiply(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, double scale = 1, int dtype = -1, Stream& stream = Stream::Null())
 
-    Computes a matrix-matrix or matrix-scalar per-element product.
+.. ocv:function:: void gpu::multiply(const GpuMat& src1, const Scalar& src2, GpuMat& dst, double scale = 1, int dtype = -1, Stream& stream = Stream::Null())
 
-    :param src1: First source matrix. ``CV_8UC1``, ``CV_8UC4``, ``CV_32SC1``, and ``CV_32FC1`` matrices are supported for now.
+    :param src1: First source matrix.
 
     :param src2: Second source matrix or a scalar to be multiplied by ``src1`` elements.
 
-    :param dst: Destination matrix with the same size and type as ``src1``.
+    :param dst: Destination matrix that has the same size and number of channels as the input array(s). The depth is defined by ``dtype`` or ``src1`` depth.
 
-See Also: :cpp:func:`multiply`
+    :param scale: Optional scale factor.
+    
+    :param dtype: Optional depth of the output array.
+
+    :param stream: Stream for the asynchronous version.
+
+.. seealso:: :ocv:func:`multiply`
 
 
-.. index:: gpu::divide
 
 gpu::divide
----------------
-.. cpp:function:: void gpu::divide(const GpuMat& src1, const GpuMat& src2, GpuMat& dst)
+-----------
+Computes a matrix-matrix or matrix-scalar division.
 
-.. cpp:function:: void gpu::divide(const GpuMat& src1, const Scalar& src2, GpuMat& dst)
+.. ocv:function:: void gpu::divide(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, double scale = 1, int dtype = -1, Stream& stream = Stream::Null())
 
-    Computes a matrix-matrix or matrix-scalar sum.
+.. ocv:function:: void gpu::divide(double src1, const GpuMat& src2, GpuMat& dst, int dtype = -1, Stream& stream = Stream::Null())
 
-    :param src1: First source matrix. ``CV_8UC1``, ``CV_8UC4``, ``CV_32SC1``, and ``CV_32FC1`` matrices are supported for now.
+    :param src1: First source matrix or a scalar.
 
     :param src2: Second source matrix or a scalar. The ``src1`` elements are divided by it.
 
-    :param dst: Destination matrix with the same size and type as ``src1``.
+    :param dst: Destination matrix that has the same size and number of channels as the input array(s). The depth is defined by ``dtype`` or ``src1`` depth.
 
-	This function, in contrast to :cpp:func:`divide`, uses a round-down rounding mode.
+    :param scale: Optional scale factor.
+    
+    :param dtype: Optional depth of the output array.
 
-See Also: :cpp:func:`divide`
+    :param stream: Stream for the asynchronous version.
+
+This function, in contrast to :ocv:func:`divide`, uses a round-down rounding mode.
+
+.. seealso:: :ocv:func:`divide`
+
+
+gpu::addWeighted
+----------------
+Computes the weighted sum of two arrays.
+
+.. ocv:function:: void gpu::addWeighted(const GpuMat& src1, double alpha, const GpuMat& src2, double beta, double gamma, GpuMat& dst, int dtype = -1, Stream& stream = Stream::Null())
+
+    :param src1: First source array.
+
+    :param alpha: Weight for the first array elements.
+
+    :param src2: Second source array of the same size and channel number as  ``src1`` .
+    
+    :param beta: Weight for the second array elements.
+
+    :param dst: Destination array that has the same size and number of channels as the input arrays.
+    
+    :param gamma: Scalar added to each sum.
+    
+    :param dtype: Optional depth of the destination array. When both input arrays have the same depth, ``dtype`` can be set to ``-1``, which will be equivalent to ``src1.depth()``.
+
+    :param stream: Stream for the asynchronous version.
+
+The function ``addWeighted`` calculates the weighted sum of two arrays as follows:
+
+.. math::
+
+    \texttt{dst} (I)= \texttt{saturate} ( \texttt{src1} (I)* \texttt{alpha} +  \texttt{src2} (I)* \texttt{beta} +  \texttt{gamma} )
+
+where ``I`` is a multi-dimensional index of array elements. In case of multi-channel arrays, each channel is processed independently.
+
+.. seealso:: :ocv:func:`addWeighted`
 
 
 
-.. index:: gpu::exp
+gpu::abs
+------------
+Computes an absolute value of each matrix element.
+
+.. ocv:function:: void gpu::abs(const GpuMat& src, GpuMat& dst, Stream& stream = Stream::Null())
+
+    :param src: Source matrix. Supports ``CV_16S`` and ``CV_32F`` depth.
+
+    :param dst: Destination matrix with the same size and type as ``src`` .
+
+    :param stream: Stream for the asynchronous version.
+
+.. seealso:: :ocv:func:`abs`
+
+
+
+gpu::sqr
+------------
+Computes a square value of each matrix element.
+
+.. ocv:function:: void gpu::sqr(const GpuMat& src, GpuMat& dst, Stream& stream = Stream::Null())
+
+    :param src: Source matrix. Supports ``CV_8U`` , ``CV_16U`` , ``CV_16S`` and ``CV_32F`` depth.
+
+    :param dst: Destination matrix with the same size and type as ``src`` .
+
+    :param stream: Stream for the asynchronous version.
+
+
+
+gpu::sqrt
+------------
+Computes a square root of each matrix element.
+
+.. ocv:function:: void gpu::sqrt(const GpuMat& src, GpuMat& dst, Stream& stream = Stream::Null())
+
+    :param src: Source matrix. Supports ``CV_8U`` , ``CV_16U`` , ``CV_16S`` and ``CV_32F`` depth.
+
+    :param dst: Destination matrix with the same size and type as ``src`` .
+
+    :param stream: Stream for the asynchronous version.
+
+.. seealso:: :ocv:func:`sqrt`
+
+
 
 gpu::exp
 ------------
-.. cpp:function:: void gpu::exp(const GpuMat& src, GpuMat& dst)
+Computes an exponent of each matrix element.
 
-    Computes an exponent of each matrix element.
+.. ocv:function:: void gpu::exp(const GpuMat& src, GpuMat& dst, Stream& stream = Stream::Null())
 
-    :param src: Source matrix. ``CV_32FC1`` matrixes are supported for now.
+    :param src: Source matrix. Supports ``CV_8U`` , ``CV_16U`` , ``CV_16S`` and ``CV_32F`` depth.
 
-    :param dst: Destination matrix with the same size and type as ``src``.
+    :param dst: Destination matrix with the same size and type as ``src`` .
 
-See Also: :cpp:func:`exp`
+    :param stream: Stream for the asynchronous version.
+
+.. seealso:: :ocv:func:`exp`
 
 
-
-.. index:: gpu::log
 
 gpu::log
 ------------
-.. cpp:function:: void gpu::log(const GpuMat& src, GpuMat& dst)
+Computes a natural logarithm of absolute value of each matrix element.
 
-    Computes a natural logarithm of absolute value of each matrix element.
+.. ocv:function:: void gpu::log(const GpuMat& src, GpuMat& dst, Stream& stream = Stream::Null())
 
-    :param src: Source matrix. ``CV_32FC1`` matrixes are supported for now.
+    :param src: Source matrix. Supports ``CV_8U`` , ``CV_16U`` , ``CV_16S`` and ``CV_32F`` depth.
 
-    :param dst: Destination matrix with the same size and type as ``src``.
+    :param dst: Destination matrix with the same size and type as ``src`` .
 
-See Also: :cpp:func:`log`
+    :param stream: Stream for the asynchronous version.
+
+.. seealso:: :ocv:func:`log`
 
 
 
-.. index:: gpu::absdiff
+gpu::pow
+------------
+Raises every matrix element to a power.
+
+.. ocv:function:: void gpu::pow(const GpuMat& src, double power, GpuMat& dst, Stream& stream = Stream::Null())
+
+    :param src: Source matrix. Supports all type, except ``CV_64F`` depth.
+
+    :param power: Exponent of power.
+
+    :param dst: Destination matrix with the same size and type as ``src`` .
+
+    :param stream: Stream for the asynchronous version.
+
+The function ``pow`` raises every element of the input matrix to ``p`` :
+
+.. math::
+
+    \texttt{dst} (I) =  \fork{\texttt{src}(I)^p}{if \texttt{p} is integer}{|\texttt{src}(I)|^p}{otherwise}
+
+.. seealso:: :ocv:func:`pow`
+
+
 
 gpu::absdiff
 ----------------
-.. cpp:function:: void gpu::absdiff(const GpuMat& src1, const GpuMat& src2, GpuMat& dst)
+Computes per-element absolute difference of two matrices (or of a matrix and scalar).
 
-.. cpp:function:: void gpu::absdiff(const GpuMat& src1, const Scalar& src2, GpuMat& dst)
+.. ocv:function:: void gpu::absdiff(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, Stream& stream = Stream::Null())
 
-    Computes per-element absolute difference of two matrices (or of matrix and scalar).
+.. ocv:function:: void gpu::absdiff(const GpuMat& src1, const Scalar& src2, GpuMat& dst, Stream& stream = Stream::Null())
 
-    :param src1: First source matrix. ``CV_8UC1``, ``CV_8UC4``, ``CV_32SC1`` and ``CV_32FC1`` matrices are supported for now.
+    :param src1: First source matrix.
 
-    :param src2: Second source matrix or a scalar to be added to ``src1``.
+    :param src2: Second source matrix or a scalar to be added to ``src1`` .
 
-    :param dst: Destination matrix with the same size and type as ``src1``.
+    :param dst: Destination matrix with the same size and type as ``src1`` .
 
-See Also: :cpp:func:`absdiff`
+    :param stream: Stream for the asynchronous version.
 
-.. index:: gpu::compare
+.. seealso:: :ocv:func:`absdiff`
+
+
 
 gpu::compare
 ----------------
-.. cpp:function:: void gpu::compare(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, int cmpop)
+Compares elements of two matrices.
 
-    Compares elements of two matrices.
+.. ocv:function:: void gpu::compare(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, int cmpop, Stream& stream = Stream::Null())
 
-    :param src1: First source matrix. ``CV_8UC4`` and ``CV_32FC1`` matrices are supported for now.
+    :param src1: First source matrix.
 
-    :param src2: Second source matrix with the same size and type as ``a``.
+    :param src2: Second source matrix with the same size and type as ``src1`` .
 
-    :param dst: Destination matrix with the same size as ``a`` and the ``CV_8UC1`` type.
+    :param dst: Destination matrix with the same size as ``src1`` and the ``CV_8UC1`` type.
 
     :param cmpop: Flag specifying the relation between the elements to be checked:
-        
+
             * **CMP_EQ:** ``src1(.) == src2(.)``
             * **CMP_GT:** ``src1(.) < src2(.)``
             * **CMP_GE:** ``src1(.) <= src2(.)``
@@ -157,88 +279,78 @@ gpu::compare
             * **CMP_LE:** ``src1(.) <= src2(.)``
             * **CMP_NE:** ``src1(.) != src2(.)``
 
-See Also: :cpp:func:`compare`
+    :param stream: Stream for the asynchronous version.
+
+.. seealso:: :ocv:func:`compare`
 
 
-.. index:: gpu::bitwise_not
 
 gpu::bitwise_not
 --------------------
-.. cpp:function:: void gpu::bitwise_not(const GpuMat& src, GpuMat& dst, const GpuMat& mask=GpuMat())
+Performs a per-element bitwise inversion.
 
-.. cpp:function:: void gpu::bitwise_not(const GpuMat& src, GpuMat& dst, const GpuMat& mask, const Stream& stream)
-
-    Performs a per-element bitwise inversion.
+.. ocv:function:: void gpu::bitwise_not(const GpuMat& src, GpuMat& dst, const GpuMat& mask=GpuMat(), Stream& stream = Stream::Null())
 
     :param src: Source matrix.
 
-    :param dst: Destination matrix with the same size and type as ``src``.
+    :param dst: Destination matrix with the same size and type as ``src`` .
 
     :param mask: Optional operation mask. 8-bit single channel image.
 
     :param stream: Stream for the asynchronous version.
 
 
-
-.. index:: gpu::bitwise_or
 
 gpu::bitwise_or
 -------------------
-.. cpp:function:: void gpu::bitwise_or(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const GpuMat& mask=GpuMat())
+Performs a per-element bitwise disjunction of two matrices or of matrix and scalar.
 
-.. cpp:function:: void gpu::bitwise_or(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const GpuMat& mask, const Stream& stream)
-
-    Performs a per-element bitwise disjunction of two matrices.
+.. ocv:function:: void gpu::bitwise_or(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const GpuMat& mask=GpuMat(), Stream& stream = Stream::Null())
+.. ocv:function:: void gpu::bitwise_or(const GpuMat& src1, const Scalar& sc, GpuMat& dst, Stream& stream = Stream::Null())
 
     :param src1: First source matrix.
 
-    :param src2: Second source matrix with the same size and type as ``src1``.
+    :param src2: Second source matrix with the same size and type as ``src1`` .
 
-    :param dst: Destination matrix with the same size and type as ``src1``.
+    :param dst: Destination matrix with the same size and type as ``src1`` .
 
     :param mask: Optional operation mask. 8-bit single channel image.
 
     :param stream: Stream for the asynchronous version.
 
 
-
-.. index:: gpu::bitwise_and
 
 gpu::bitwise_and
 --------------------
-.. cpp:function:: void gpu::bitwise_and(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const GpuMat& mask=GpuMat())
+Performs a per-element bitwise conjunction of two matrices or of matrix and scalar.
 
-.. cpp:function:: void gpu::bitwise_and(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const GpuMat& mask, const Stream& stream)
-
-    Performs a per-element bitwise conjunction of two matrices.
+.. ocv:function:: void gpu::bitwise_and(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const GpuMat& mask=GpuMat(), Stream& stream = Stream::Null())
+.. ocv:function:: void gpu::bitwise_and(const GpuMat& src1, const Scalar& sc, GpuMat& dst, Stream& stream = Stream::Null())
 
     :param src1: First source matrix.
 
-    :param src2: Second source matrix with the same size and type as ``src1``.
+    :param src2: Second source matrix with the same size and type as ``src1`` .
 
-    :param dst: Destination matrix with the same size and type as ``src1``.
+    :param dst: Destination matrix with the same size and type as ``src1`` .
 
     :param mask: Optional operation mask. 8-bit single channel image.
 
     :param stream: Stream for the asynchronous version.
 
 
-
-.. index:: gpu::bitwise_xor
 
 gpu::bitwise_xor
 --------------------
-.. cpp:function:: void gpu::bitwise_xor(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const GpuMat& mask=GpuMat())
+Performs a per-element bitwise ``exclusive or`` operation of two matrices of matrix and scalar.
 
-.. cpp:function:: void gpu::bitwise_xor(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const GpuMat& mask, const Stream& stream)
-
-    Performs a per-element bitwise "exclusive or" operation of two matrices.
+.. ocv:function:: void gpu::bitwise_xor(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const GpuMat& mask=GpuMat(), Stream& stream = Stream::Null())
+.. ocv:function:: void gpu::bitwise_xor(const GpuMat& src1, const Scalar& sc, GpuMat& dst, Stream& stream = Stream::Null())
 
     :param src1: First source matrix.
 
-    :param src2: Second source matrix with the same size and type as ``src1``.
+    :param src2: Second source matrix with the same size and type as ``src1`` .
 
-    :param dst: Destination matrix with the same size and type as ``src1``.
+    :param dst: Destination matrix with the same size and type as ``src1`` .
 
     :param mask: Optional operation mask. 8-bit single channel image.
 
@@ -246,52 +358,72 @@ gpu::bitwise_xor
 
 
 
-.. index:: gpu::min
+gpu::rshift
+--------------------
+Performs pixel by pixel right shift of an image by a constant value.
+
+.. ocv:function:: void gpu::rshift(const GpuMat& src, const Scalar& sc, GpuMat& dst, Stream& stream = Stream::Null())
+
+    :param src: Source matrix. Supports 1, 3 and 4 channels images with integers elements.
+
+    :param sc: Constant values, one per channel.
+
+    :param dst: Destination matrix with the same size and type as ``src`` .
+
+    :param stream: Stream for the asynchronous version.
+
+
+
+gpu::lshift
+--------------------
+Performs pixel by pixel right left of an image by a constant value.
+
+.. ocv:function:: void gpu::lshift(const GpuMat& src, const Scalar& sc, GpuMat& dst, Stream& stream = Stream::Null())
+
+    :param src: Source matrix. Supports 1, 3 and 4 channels images with ``CV_8U`` , ``CV_16U`` or ``CV_32S`` depth.
+
+    :param sc: Constant values, one per channel.
+
+    :param dst: Destination matrix with the same size and type as ``src`` .
+
+    :param stream: Stream for the asynchronous version.
+
+
 
 gpu::min
 ------------
-.. cpp:function:: void gpu::min(const GpuMat& src1, const GpuMat& src2, GpuMat& dst)
+Computes the per-element minimum of two matrices (or a matrix and a scalar).
 
-.. cpp:function:: void gpu::min(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const Stream& stream)
+.. ocv:function:: void gpu::min(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, Stream& stream = Stream::Null())
 
-.. cpp:function:: void gpu::min(const GpuMat& src1, double src2, GpuMat& dst)
-
-.. cpp:function:: void gpu::min(const GpuMat& src1, double src2, GpuMat& dst, const Stream& stream)
-
-    Computes the per-element minimum of two matrices (or a matrix and a scalar).
+.. ocv:function:: void gpu::min(const GpuMat& src1, double src2, GpuMat& dst, Stream& stream = Stream::Null())
 
     :param src1: First source matrix.
 
     :param src2: Second source matrix or a scalar to compare ``src1`` elements with.
 
-    :param dst: Destination matrix with the same size and type as ``src1``.
+    :param dst: Destination matrix with the same size and type as ``src1`` .
 
     :param stream: Stream for the asynchronous version.
 
-See Also: :cpp:func:`min`
+.. seealso:: :ocv:func:`min`
 
 
-
-.. index:: gpu::max
 
 gpu::max
 ------------
-.. cpp:function:: void gpu::max(const GpuMat& src1, const GpuMat& src2, GpuMat& dst)
+Computes the per-element maximum of two matrices (or a matrix and a scalar).
 
-.. cpp:function:: void gpu::max(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, const Stream& stream)
+.. ocv:function:: void gpu::max(const GpuMat& src1, const GpuMat& src2, GpuMat& dst, Stream& stream = Stream::Null())
 
-.. cpp:function:: void gpu::max(const GpuMat& src1, double src2, GpuMat& dst)
-
-.. cpp:function:: void gpu::max(const GpuMat& src1, double src2, GpuMat& dst, const Stream& stream)
-
-    Computes the per-element maximum of two matrices (or a matrix and a scalar).
+.. ocv:function:: void gpu::max(const GpuMat& src1, double src2, GpuMat& dst, Stream& stream = Stream::Null())
 
     :param src1: First source matrix.
 
     :param src2: Second source matrix or a scalar to compare ``src1`` elements with.
 
-    :param dst: Destination matrix with the same size and type as ``src1``.
+    :param dst: Destination matrix with the same size and type as ``src1`` .
 
     :param stream: Stream for the asynchronous version.
 
-See Also: :cpp:func:`max`
+.. seealso:: :ocv:func:`max`

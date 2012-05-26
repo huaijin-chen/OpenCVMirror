@@ -244,7 +244,8 @@ void parserRFilter  (FILE * xmlf, int p, CvLSVMFilterObject * model, float *b){
                 }
                 if(tagVal == WEIGHTS){
                     data = (double *)malloc( sizeof(double) * p * sizeX * sizeY);
-                    fread(data, sizeof(double), p * sizeX * sizeY, xmlf);
+                    size_t elements_read = fread(data, sizeof(double), p * sizeX * sizeY, xmlf);
+                    CV_Assert(elements_read == (size_t)(p * sizeX * sizeY));
                     model->H = (float *)malloc(sizeof(float)* p * sizeX * sizeY);
                     for(ii = 0; ii < p * sizeX * sizeY; ii++){
                         model->H[ii] = (float)data[ii];
@@ -502,7 +503,8 @@ void parserPFilter  (FILE * xmlf, int p, int /*N_path*/, CvLSVMFilterObject * mo
                 }
                 if(tagVal == WEIGHTS){
                     data = (double *)malloc( sizeof(double) * p * sizeX * sizeY);
-                    fread(data, sizeof(double), p * sizeX * sizeY, xmlf);
+                    size_t elements_read = fread(data, sizeof(double), p * sizeX * sizeY, xmlf);
+                    CV_Assert(elements_read == (size_t)(p * sizeX * sizeY));
                     model->H = (float *)malloc(sizeof(float)* p * sizeX * sizeY);
                     for(ii = 0; ii < p * sizeX * sizeY; ii++){
                         model->H[ii] = (float)data[ii];
@@ -658,8 +660,7 @@ void parserModel(FILE * xmlf, CvLSVMFilterObject *** model, int *last, int *max,
                 if(tagVal == EMODEL){
                     //printf("</Model>\n");
                     for(ii = 0; ii <= *last; ii++){
-                        (*model)[ii]->p = p;
-                        (*model)[ii]->xp = 9;
+                        (*model)[ii]->numFeatures = p;
                     }
                     * count = N_comp;
                     return;
@@ -672,11 +673,11 @@ void parserModel(FILE * xmlf, CvLSVMFilterObject *** model, int *last, int *max,
                         * b    = bb;
                         * count = N_comp + 1; 
                     } else {
-                        cmp = (int    *)malloc(sizeof(int)    * (N_comp + 1));
+                        cmp = (int   *)malloc(sizeof(int)   * (N_comp + 1));
                         bb  = (float *)malloc(sizeof(float) * (N_comp + 1));
                         for(ii = 0; ii < N_comp; ii++){
-                            cmp[i] = (* comp)[ii];
-                            bb [i] = (* b   )[ii];
+                            cmp[ii] = (* comp)[ii];
+                            bb [ii] = (* b   )[ii];
                         }
                         free(* comp);
                         free(* b   );
@@ -736,9 +737,8 @@ int LSVMparser(const char * filename, CvLSVMFilterObject *** model, int *last, i
     //printf("parse : %s\n", filename);
 
     xmlf = fopen(filename, "rb");
-	if(xmlf == NULL){
-		return LSVM_PARSER_FILE_NOT_FOUND;
-	}
+    if(xmlf == NULL)
+        return LSVM_PARSER_FILE_NOT_FOUND;
     
     i   = 0;
     j   = 0;
@@ -768,7 +768,9 @@ int LSVMparser(const char * filename, CvLSVMFilterObject *** model, int *last, i
             }
         }        
     }
-	return LATENT_SVM_OK;
+    
+    fclose(xmlf);
+    return LATENT_SVM_OK;
 }
 
 int loadModel(

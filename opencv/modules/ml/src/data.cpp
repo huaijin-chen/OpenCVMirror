@@ -44,36 +44,34 @@
 #define MISS_VAL    FLT_MAX 
 #define CV_VAR_MISS    0
 
-CvTrainTestSplit :: CvTrainTestSplit()
+CvTrainTestSplit::CvTrainTestSplit()
 {
     train_sample_part_mode = CV_COUNT;
     train_sample_part.count = -1;
-    class_part = 0;
     mix = false;
 }
 
-CvTrainTestSplit :: CvTrainTestSplit( int _train_sample_count, bool _mix )
+CvTrainTestSplit::CvTrainTestSplit( int _train_sample_count, bool _mix )
 {
     train_sample_part_mode = CV_COUNT;
     train_sample_part.count = _train_sample_count;
-    class_part = 0;
     mix = _mix;
 }
     
-CvTrainTestSplit :: CvTrainTestSplit( float _train_sample_portion, bool _mix )
+CvTrainTestSplit::CvTrainTestSplit( float _train_sample_portion, bool _mix )
 {
     train_sample_part_mode = CV_PORTION;
     train_sample_part.portion = _train_sample_portion;
-    class_part = 0;
     mix = _mix;
 }
 
 ////////////////
 
-CvMLData :: CvMLData()
+CvMLData::CvMLData()
 {
     values = missing = var_types = var_idx_mask = response_out = var_idx_out = var_types_out = 0;
     train_sample_idx = test_sample_idx = 0;
+	header_lines_number = 0;
     sample_idx = 0;
     response_idx = -1;
 
@@ -83,27 +81,24 @@ CvMLData :: CvMLData()
     miss_ch = '?';
     //flt_separator = '.';
 
-    class_map = new std::map<std::string, int>();
     rng = &cv::theRNG();
 }
 
-CvMLData :: ~CvMLData()
+CvMLData::~CvMLData()
 {
     clear();
-    delete class_map;
 }
 
-void CvMLData :: free_train_test_idx()
+void CvMLData::free_train_test_idx()
 {
     cvReleaseMat( &train_sample_idx );
     cvReleaseMat( &test_sample_idx );
     sample_idx = 0;
 }
 
-void CvMLData :: clear()
+void CvMLData::clear()
 {
-    if ( !class_map->empty() )
-        class_map->clear();
+    class_map.clear();
 
     cvReleaseMat( &values );
     cvReleaseMat( &missing );
@@ -121,6 +116,17 @@ void CvMLData :: clear()
     response_idx = -1;
 
     train_sample_count = -1;
+}
+
+
+void CvMLData::set_header_lines_number( int idx )
+{
+	header_lines_number = std::max(0, idx);
+}
+
+int CvMLData::get_header_lines_number() const
+{
+	return header_lines_number;
 }
 
 static char *fgets_chomp(char *str, int n, FILE *stream)
@@ -159,23 +165,43 @@ int CvMLData::read_csv(const char* filename)
     if( !file )
         return -1;
 
-    // read the first line and determine the number of variables
-    std::vector<char> _buf(M);
+	std::vector<char> _buf(M);
     char* buf = &_buf[0];
+    
+	// skip header lines
+	for( int i = 0; i < header_lines_number; i++ )
+		if( fgets( buf, M, file ) == 0 )
+			return -1;
+
+    // read the first data line and determine the number of variables
     if( !fgets_chomp( buf, M, file ))
     {
         fclose(file);
         return -1;
     }
-    for( ptr = buf; *ptr != '\0'; ptr++ )
-        cols_count += (*ptr == delimiter);
+
+    ptr = buf;
+    while( *ptr == ' ' )
+        ptr++;
+    for( ; *ptr != '\0'; )
+    {
+        if(*ptr == delimiter || *ptr == ' ')
+        {
+            cols_count++;
+            ptr++;
+            while( *ptr == ' ' ) ptr++;
+        }
+        else
+            ptr++;
+    }
+
+	cols_count++;
 
     if ( cols_count == 0)
     {
         fclose(file);
         return -1;
     }
-    cols_count++;
 
     // create temporary memory storage to store the whole database
     el_ptr = new float[cols_count];
@@ -192,10 +218,7 @@ int CvMLData::read_csv(const char* filename)
         int type;
         token = strtok(buf, str_delimiter);
         if (!token) 
-        {
-             fclose(file);
-             return -1;
-        }
+            break;
         for (int i = 0; i < cols_count-1; i++)
         {
             str_to_flt_elem( token, el_ptr[i], type);
@@ -210,7 +233,7 @@ int CvMLData::read_csv(const char* filename)
         str_to_flt_elem( token, el_ptr[cols_count-1], type);
         var_types_ptr[cols_count-1] |= type;
         cvSeqPush( seq, el_ptr );
-        if( !fgets_chomp( buf, M, file ) || !strchr( buf, delimiter ) )
+        if( !fgets_chomp( buf, M, file ) )
             break;
     }
     fclose(file);
@@ -244,7 +267,30 @@ int CvMLData::read_csv(const char* filename)
     return 0;
 }
 
-void CvMLData :: str_to_flt_elem( const char* token, float& flt_elem, int& type)
+const CvMat* CvMLData::get_values() const
+{
+    return values;
+}
+
+const CvMat* CvMLData::get_missing() const
+{
+    CV_FUNCNAME( "CvMLData::get_missing" );
+    __BEGIN__;
+
+    if ( !values )
+        CV_ERROR( CV_StsInternal, "data is empty" );
+
+    __END__;
+
+    return missing;
+}
+
+const std::map<std::string, int>& CvMLData::get_class_labels_map() const
+{
+    return class_map;
+}
+
+void CvMLData::str_to_flt_elem( const char* token, float& flt_elem, int& type)
 {
     
     char* stopstring = NULL;
@@ -260,12 +306,12 @@ void CvMLData :: str_to_flt_elem( const char* token, float& flt_elem, int& type)
     {
         if ( (*stopstring != 0) && (*stopstring != '\n') && (strcmp(stopstring, "\r\n") != 0) ) // class label
         {
-            int idx = (*class_map)[token];
+            int idx = class_map[token];
             if ( idx == 0)
             {
                 total_class_count++;
                 idx = total_class_count;
-                (*class_map)[token] = idx;
+                class_map[token] = idx;
             }
             flt_elem = (float)idx;
             type = CV_VAR_CATEGORICAL;
@@ -273,9 +319,9 @@ void CvMLData :: str_to_flt_elem( const char* token, float& flt_elem, int& type)
     }
 }
 
-void CvMLData :: set_delimiter(char ch)
+void CvMLData::set_delimiter(char ch)
 {
-    CV_FUNCNAME( "CvMLData :: set_delimited" );
+    CV_FUNCNAME( "CvMLData::set_delimited" );
     __BEGIN__;
 
     if (ch == miss_ch /*|| ch == flt_separator*/)
@@ -286,9 +332,14 @@ void CvMLData :: set_delimiter(char ch)
     __END__;
 }
 
-void CvMLData :: set_miss_ch(char ch)
+char CvMLData::get_delimiter() const
 {
-    CV_FUNCNAME( "CvMLData :: set_miss_ch" );
+    return delimiter;
+}
+
+void CvMLData::set_miss_ch(char ch)
+{
+    CV_FUNCNAME( "CvMLData::set_miss_ch" );
     __BEGIN__;
 
     if (ch == delimiter/* || ch == flt_separator*/)
@@ -299,9 +350,14 @@ void CvMLData :: set_miss_ch(char ch)
     __END__;
 }
 
-void CvMLData :: set_response_idx( int idx )
+char CvMLData::get_miss_ch() const
 {
-    CV_FUNCNAME( "CvMLData :: set_response_idx" );
+    return miss_ch;
+}
+
+void CvMLData::set_response_idx( int idx )
+{
+    CV_FUNCNAME( "CvMLData::set_response_idx" );
     __BEGIN__;
 
     if ( !values )
@@ -319,9 +375,20 @@ void CvMLData :: set_response_idx( int idx )
     __END__;    
 }
 
-void CvMLData :: change_var_type( int var_idx, int type )
+int CvMLData::get_response_idx() const
 {
-    CV_FUNCNAME( "CvMLData :: change_var_type" );
+    CV_FUNCNAME( "CvMLData::get_response_idx" );
+    __BEGIN__;
+
+    if ( !values )
+        CV_ERROR( CV_StsInternal, "data is empty" );
+     __END__;
+    return response_idx;
+}
+
+void CvMLData::change_var_type( int var_idx, int type )
+{
+    CV_FUNCNAME( "CvMLData::change_var_type" );
     __BEGIN__;
     
     int var_count = 0;
@@ -347,9 +414,9 @@ void CvMLData :: change_var_type( int var_idx, int type )
     return;
 }
 
-void CvMLData :: set_var_types( const char* str )
+void CvMLData::set_var_types( const char* str )
 {
-    CV_FUNCNAME( "CvMLData :: set_var_types" );
+    CV_FUNCNAME( "CvMLData::set_var_types" );
     __BEGIN__;
 
     const char* ord = 0, *cat = 0;
@@ -472,9 +539,9 @@ void CvMLData :: set_var_types( const char* str )
      __END__;
 }
 
-const CvMat* CvMLData :: get_var_types()
+const CvMat* CvMLData::get_var_types()
 {
-    CV_FUNCNAME( "CvMLData :: get_var_types" );
+    CV_FUNCNAME( "CvMLData::get_var_types" );
     __BEGIN__;
 
     uchar *var_types_out_ptr = 0;
@@ -511,9 +578,14 @@ const CvMat* CvMLData :: get_var_types()
     return var_types_out;
 }
 
-const CvMat* CvMLData :: get_responses()
+int CvMLData::get_var_type( int var_idx ) const
 {
-    CV_FUNCNAME( "CvMLData :: get_responses_ptr" );
+    return var_types->data.ptr[var_idx];
+}
+
+const CvMat* CvMLData::get_responses()
+{
+    CV_FUNCNAME( "CvMLData::get_responses_ptr" );
     __BEGIN__;
 
     int var_count = 0;
@@ -535,16 +607,13 @@ const CvMat* CvMLData :: get_responses()
     return response_out;
 }
 
-void CvMLData :: set_train_test_split( const CvTrainTestSplit * spl)
+void CvMLData::set_train_test_split( const CvTrainTestSplit * spl)
 {
-    CV_FUNCNAME( "CvMLData :: set_division" );
+    CV_FUNCNAME( "CvMLData::set_division" );
     __BEGIN__;
 
     int sample_count = 0;
 
-    if ( spl->class_part )
-        CV_ERROR( CV_StsBadArg, "this division type is not supported yet" );
-    
     if ( !values )
         CV_ERROR( CV_StsInternal, "data is empty" );
 
@@ -566,7 +635,7 @@ void CvMLData :: set_train_test_split( const CvTrainTestSplit * spl)
             CV_ERROR( CV_StsBadArg, "train samples count is not correct" );
         train_sample_portion = train_sample_portion <= FLT_EPSILON || 
             1 - train_sample_portion <= FLT_EPSILON ? 1 : train_sample_portion;
-        train_sample_count = cvFloor( train_sample_portion * sample_count );
+        train_sample_count = std::max(1, cvFloor( train_sample_portion * sample_count ));
     }
 
     if ( train_sample_count == sample_count )
@@ -585,8 +654,10 @@ void CvMLData :: set_train_test_split( const CvTrainTestSplit * spl)
         for (int i = 0; i < sample_count; i++ )
             sample_idx[i] = i;
         train_sample_idx = cvCreateMatHeader( 1, train_sample_count, CV_32SC1 );
-        test_sample_idx = cvCreateMatHeader( 1, test_sample_count, CV_32SC1 );
         *train_sample_idx = cvMat( 1, train_sample_count, CV_32SC1, &sample_idx[0] );
+
+        CV_Assert(test_sample_count > 0);
+        test_sample_idx = cvCreateMatHeader( 1, test_sample_count, CV_32SC1 );
         *test_sample_idx = cvMat( 1, test_sample_count, CV_32SC1, &sample_idx[train_sample_count] );
     }
     
@@ -597,9 +668,41 @@ void CvMLData :: set_train_test_split( const CvTrainTestSplit * spl)
     __END__;
 }
 
-void CvMLData :: mix_train_and_test_idx()
+const CvMat* CvMLData::get_train_sample_idx() const
 {
-    if ( !values || !sample_idx) return;
+    CV_FUNCNAME( "CvMLData::get_train_sample_idx" );
+    __BEGIN__;
+
+    if ( !values )
+        CV_ERROR( CV_StsInternal, "data is empty" );
+    __END__;
+
+    return train_sample_idx;
+}
+
+const CvMat* CvMLData::get_test_sample_idx() const
+{
+    CV_FUNCNAME( "CvMLData::get_test_sample_idx" );
+    __BEGIN__;
+
+    if ( !values )
+        CV_ERROR( CV_StsInternal, "data is empty" );
+    __END__;
+
+    return test_sample_idx;
+}
+
+void CvMLData::mix_train_and_test_idx()
+{
+    CV_FUNCNAME( "CvMLData::mix_train_and_test_idx" );
+    __BEGIN__;
+
+    if ( !values )
+        CV_ERROR( CV_StsInternal, "data is empty" );
+    __END__;
+
+    if ( !sample_idx)
+        return;
 
     if ( train_sample_count > 0 && train_sample_count < values->rows )
     {
@@ -614,9 +717,9 @@ void CvMLData :: mix_train_and_test_idx()
     }
 }
 
-const CvMat* CvMLData :: get_var_idx()
+const CvMat* CvMLData::get_var_idx()
 {
-     CV_FUNCNAME( "CvMLData :: get_var_idx" );
+     CV_FUNCNAME( "CvMLData::get_var_idx" );
     __BEGIN__;
 
     int avcount = 0;
@@ -654,9 +757,14 @@ const CvMat* CvMLData :: get_var_idx()
     return var_idx_out;
 }
 
-void CvMLData :: chahge_var_idx( int vi, bool state )
+void CvMLData::chahge_var_idx( int vi, bool state )
 {
-     CV_FUNCNAME( "CvMLData :: get_responses_ptr" );
+    change_var_idx( vi, state );
+}
+
+void CvMLData::change_var_idx( int vi, bool state )
+{
+     CV_FUNCNAME( "CvMLData::change_var_idx" );
     __BEGIN__;
 
     int var_count = 0;

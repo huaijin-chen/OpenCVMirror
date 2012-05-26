@@ -5,8 +5,9 @@
 #include "cvconfig.h"
 #include <iostream>
 #include <iomanip>
-#include "opencv2/opencv.hpp"
+#include <cstdio>
 #include "opencv2/gpu/gpu.hpp"
+#include "opencv2/highgui/highgui.hpp"
 
 #ifdef HAVE_CUDA
 #include "NCVHaarObjectDetection.hpp"
@@ -153,6 +154,8 @@ int main(int argc, const char** argv)
     ncvAssertPrintReturn(cv::gpu::getCudaEnabledDeviceCount() != 0, "No GPU found or the library is compiled without GPU support", -1);
     ncvAssertPrintReturn(argc == 3, "Invalid number of arguments", -1);
 
+    cv::gpu::printShortCudaDeviceInfo(cv::gpu::getDevice());
+
     string cascadeName = argv[1];
     string inputName = argv[2];
 
@@ -211,9 +214,9 @@ int main(int argc, const char** argv)
     //
     //==============================================================================
 
-    NCVMemNativeAllocator gpuCascadeAllocator(NCVMemoryTypeDevice, devProp.textureAlignment);
+    NCVMemNativeAllocator gpuCascadeAllocator(NCVMemoryTypeDevice, static_cast<Ncv32u>(devProp.textureAlignment));
     ncvAssertPrintReturn(gpuCascadeAllocator.isInitialized(), "Error creating cascade GPU allocator", -1);
-    NCVMemNativeAllocator cpuCascadeAllocator(NCVMemoryTypeHostPinned, devProp.textureAlignment);
+    NCVMemNativeAllocator cpuCascadeAllocator(NCVMemoryTypeHostPinned, static_cast<Ncv32u>(devProp.textureAlignment));
     ncvAssertPrintReturn(cpuCascadeAllocator.isInitialized(), "Error creating cascade CPU allocator", -1);
 
     Ncv32u haarNumStages, haarNumNodes, haarNumFeatures;
@@ -225,6 +228,7 @@ int main(int argc, const char** argv)
     NCVVectorAlloc<HaarClassifierNode128> h_haarNodes(cpuCascadeAllocator, haarNumNodes);
     ncvAssertPrintReturn(h_haarNodes.isMemAllocated(), "Error in cascade CPU allocator", -1);
     NCVVectorAlloc<HaarFeature64> h_haarFeatures(cpuCascadeAllocator, haarNumFeatures);
+
     ncvAssertPrintReturn(h_haarFeatures.isMemAllocated(), "Error in cascade CPU allocator", -1);
 
     HaarClassifierCascadeDescriptor haar;
@@ -251,9 +255,9 @@ int main(int argc, const char** argv)
     //
     //==============================================================================
 
-    NCVMemStackAllocator gpuCounter(devProp.textureAlignment);
+    NCVMemStackAllocator gpuCounter(static_cast<Ncv32u>(devProp.textureAlignment));
     ncvAssertPrintReturn(gpuCounter.isInitialized(), "Error creating GPU memory counter", -1);
-    NCVMemStackAllocator cpuCounter(devProp.textureAlignment);
+    NCVMemStackAllocator cpuCounter(static_cast<Ncv32u>(devProp.textureAlignment));
     ncvAssertPrintReturn(cpuCounter.isInitialized(), "Error creating CPU memory counter", -1);
 
     ncvStat = process(NULL, frameSize.width, frameSize.height,
@@ -263,9 +267,9 @@ int main(int argc, const char** argv)
                       gpuCounter, cpuCounter, devProp);
     ncvAssertPrintReturn(ncvStat == NCV_SUCCESS, "Error in memory counting pass", -1);
 
-    NCVMemStackAllocator gpuAllocator(NCVMemoryTypeDevice, gpuCounter.maxSize(), devProp.textureAlignment);
+    NCVMemStackAllocator gpuAllocator(NCVMemoryTypeDevice, gpuCounter.maxSize(), static_cast<Ncv32u>(devProp.textureAlignment));
     ncvAssertPrintReturn(gpuAllocator.isInitialized(), "Error creating GPU memory allocator", -1);
-    NCVMemStackAllocator cpuAllocator(NCVMemoryTypeHostPinned, cpuCounter.maxSize(), devProp.textureAlignment);
+    NCVMemStackAllocator cpuAllocator(NCVMemoryTypeHostPinned, cpuCounter.maxSize(), static_cast<Ncv32u>(devProp.textureAlignment));
     ncvAssertPrintReturn(cpuAllocator.isInitialized(), "Error creating CPU memory allocator", -1);
 
     printf("Initialized for frame size [%dx%d]\n", frameSize.width, frameSize.height);

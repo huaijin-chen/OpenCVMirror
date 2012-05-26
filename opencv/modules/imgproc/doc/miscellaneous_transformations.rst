@@ -3,15 +3,17 @@ Miscellaneous Image Transformations
 
 .. highlight:: cpp
 
-.. index:: adaptiveThreshold
-
-.. _adaptiveThreshold:
 
 adaptiveThreshold
 ---------------------
-.. cpp:function:: void adaptiveThreshold( InputArray src, OutputArray dst, double maxValue,                        int adaptiveMethod, int thresholdType,                        int blockSize, double C )
+Applies an adaptive threshold to an array.
 
-    Applies an adaptive threshold to an array.
+.. ocv:function:: void adaptiveThreshold( InputArray src, OutputArray dst, double maxValue,                        int adaptiveMethod, int thresholdType,                        int blockSize, double C )
+
+.. ocv:pyfunction:: cv2.adaptiveThreshold(src, maxValue, adaptiveMethod, thresholdType, blockSize, C[, dst]) -> dst
+
+.. ocv:cfunction:: void cvAdaptiveThreshold( const CvArr* src, CvArr* dst, double maxValue, int adaptiveMethod=CV_ADAPTIVE_THRESH_MEAN_C, int thresholdType=CV_THRESH_BINARY, int blockSize=3, double param1=5 )
+.. ocv:pyoldfunction:: cv.AdaptiveThreshold(src, dst, maxValue, adaptiveMethod=CV_ADAPTIVE_THRESH_MEAN_C, thresholdType=CV_THRESH_BINARY, blockSize=3, param1=5)-> None
 
     :param src: Source 8-bit single-channel image.
 
@@ -22,6 +24,7 @@ adaptiveThreshold
     :param adaptiveMethod: Adaptive thresholding algorithm to use, ``ADAPTIVE_THRESH_MEAN_C``  or  ``ADAPTIVE_THRESH_GAUSSIAN_C`` . See the details below.
 
     :param thresholdType: Thresholding type that must be either  ``THRESH_BINARY``  or  ``THRESH_BINARY_INV`` .
+    
     :param blockSize: Size of a pixel neighborhood that is used to calculate a threshold value for the pixel: 3, 5, 7, and so on.
 
     :param C: Constant subtracted from the mean or weighted mean (see the details below). Normally, it is positive but may be zero or negative as well.
@@ -54,36 +57,40 @@ where
     :math:`T(x, y)`     is a weighted sum (cross-correlation with a Gaussian window) of the
     :math:`\texttt{blockSize} \times \texttt{blockSize}`     neighborhood of
     :math:`(x, y)`      minus ``C``     . The default sigma (standard deviation) is used for the specified ``blockSize``   . See
-    :cpp:func:`getGaussianKernel`     .
+    :ocv:func:`getGaussianKernel`     .
 
 The function can process the image in-place.
 
-See Also:
-:cpp:func:`threshold`,
-:cpp:func:`blur`,
-:cpp:func:`GaussianBlur`
+.. seealso::
+
+    :ocv:func:`threshold`,
+    :ocv:func:`blur`,
+    :ocv:func:`GaussianBlur`
 
 
-.. index:: cvtColor
-
-.. _cvtColor:
 
 cvtColor
 ------------
-.. cpp:function:: void cvtColor( InputArray src, OutputArray dst, int code, int dstCn=0 )
+Converts an image from one color space to another.
 
-    Converts an image from one color space to another.
+.. ocv:function:: void cvtColor( InputArray src, OutputArray dst, int code, int dstCn=0 )
+
+.. ocv:pyfunction:: cv2.cvtColor(src, code[, dst[, dstCn]]) -> dst
+
+.. ocv:cfunction:: void cvCvtColor( const CvArr* src, CvArr* dst, int code )
+.. ocv:pyoldfunction:: cv.CvtColor(src, dst, code)-> None
 
     :param src: Source image: 8-bit unsigned, 16-bit unsigned ( ``CV_16UC...`` ), or single-precision floating-point.
 
     :param dst: Destination image of the same size and depth as  ``src`` .
     
-	:param code: Color space conversion code. See the description below.
+    :param code: Color space conversion code. See the description below.
 
     :param dstCn: Number of channels in the destination image. If the parameter is 0, the number of the channels is derived automatically from  ``src``  and   ``code`` .
 
 The function converts an input image from one color
-space to another. In case of transformation to-from RGB color space, the order of the channels should be specified explicitly (RGB or BGR).
+space to another. In case of a transformation to-from RGB color space, the order of the channels should be specified explicitly (RGB or BGR).
+Note that the default color format in OpenCV is often referred to as RGB but it is actually BGR (the bytes are reversed). So the first byte in a standard (24-bit) color image will be an 8-bit Blue component, the second byte will be Green, and the third byte will be Red. The fourth, fifth, and sixth bytes would then be the second pixel (Blue, then Green, then Red), and so on.
 
 The conventional ranges for R, G, and B channel values are:
 
@@ -98,10 +105,12 @@ The conventional ranges for R, G, and B channel values are:
 
 In case of linear transformations, the range does not matter.
 But in case of a non-linear transformation, an input RGB image should be normalized to the proper value range to get the correct results, for example, for RGB
-:math:`\rightarrow` L*u*v* transformation. For example, if you have a 32-bit floating-point image directly converted from an 8-bit image without any scaling, then it will have the 0..255 value range, instead of 0..1 assumed by the function. So, before calling ``cvtColor`` , you need first to scale the image down: ::
+:math:`\rightarrow` L*u*v* transformation. For example, if you have a 32-bit floating-point image directly converted from an 8-bit image without any scaling, then it will have the 0..255 value range instead of 0..1 assumed by the function. So, before calling ``cvtColor`` , you need first to scale the image down: ::
 
     img *= 1./255;
     cvtColor(img, img, CV_BGR2Luv);
+
+If you use ``cvtColor`` with 8-bit images, the conversion will have some information lost. For many applications, this will not be noticeable but it is recommended to use 32-bit images in applications that need the full range of colors or that convert an image before an operation and then convert back.
 
 The function can do the following transformations:
 
@@ -127,7 +136,7 @@ The function can do the following transformations:
     ..
 
     More advanced channel reordering can also be done with
-    :cpp:func:`mixChannels`     .
+    :ocv:func:`mixChannels`     .
 
 *
     RGB
@@ -396,35 +405,41 @@ The function can do the following transformations:
     columns, respectively. For example, the above pattern has a very
     popular "BG" type.
 
-.. index:: distanceTransform
-
-.. _distanceTransform:
 
 distanceTransform
 ---------------------
-.. cpp:function:: void distanceTransform( InputArray src, OutputArray dst, int distanceType, int maskSize )
+Calculates the distance to the closest zero pixel for each pixel of the source image.
 
-.. cpp:function:: void distanceTransform( InputArray src, OutputArray dst, OutputArray labels, int distanceType, int maskSize )
+.. ocv:function:: void distanceTransform( InputArray src, OutputArray dst, int distanceType, int maskSize )
 
-    Calculates the distance to the closest zero pixel for each pixel of the source image.
+.. ocv:function:: void distanceTransform( InputArray src, OutputArray dst, OutputArray labels, int distanceType, int maskSize, int labelType=DIST_LABEL_CCOMP )
+
+.. ocv:pyfunction:: cv2.distanceTransform(src, distanceType, maskSize[, dst[, labels[, labelType=cv2.DIST_LABEL_CCOMP]]]) -> dst, labels
+
+.. ocv:cfunction:: void cvDistTransform( const CvArr* src, CvArr* dst, int distanceType=CV_DIST_L2, int maskSize=3, const float* mask=NULL, CvArr* labels=NULL, int labelType=CV_DIST_LABEL_CCOMP )
+
+.. ocv:pyoldfunction:: cv.DistTransform(src, dst, distanceType=CV_DIST_L2, maskSize=3, mask=None, labels=None)-> None
 
     :param src: 8-bit, single-channel (binary) source image.
 
     :param dst: Output image with calculated distances. It is a 32-bit floating-point, single-channel image of the same size as  ``src`` .
+    
     :param distanceType: Type of distance. It can be  ``CV_DIST_L1, CV_DIST_L2`` , or  ``CV_DIST_C`` .
+    
     :param maskSize: Size of the distance transform mask. It can be 3, 5, or  ``CV_DIST_MASK_PRECISE``  (the latter option is only supported by the first function). In case of the ``CV_DIST_L1``  or  ``CV_DIST_C``  distance type, the parameter is forced to 3 because a  :math:`3\times 3`  mask gives the same result as  :math:`5\times 5`  or any larger aperture.
 
     :param labels: Optional output 2D array of labels (the discrete Voronoi diagram). It has the type  ``CV_32SC1``  and the same size as  ``src`` . See the details below.
+    
+    :param labelType: Type of the label array to build. If ``labelType==DIST_LABEL_CCOMP`` then each connected component of zeros in ``src`` (as well as all the non-zero pixels closest to the connected component) will be assigned the same label. If ``labelType==DIST_LABEL_PIXEL`` then each zero pixel (and all the non-zero pixels closest to it) gets its own label.
 
 The functions ``distanceTransform`` calculate the approximate or precise
 distance from every binary image pixel to the nearest zero pixel.
 For zero image pixels, the distance will obviously be zero.
 
-When ``maskSize == CV_DIST_MASK_PRECISE`` and ``distanceType == CV_DIST_L2`` , the function runs the algorithm described in
-Felzenszwalb04.
+When ``maskSize == CV_DIST_MASK_PRECISE`` and ``distanceType == CV_DIST_L2`` , the function runs the algorithm described in [Felzenszwalb04]_. This algorithm is parallelized with the TBB library.
 
 In other cases, the algorithm
-Borgefors86
+[Borgefors86]_
 is used. This means that
 for a pixel the function finds the shortest path to the nearest zero pixel
 consisting of basic shifts: horizontal,
@@ -434,7 +449,7 @@ basic distances. Since the distance function should be symmetric,
 all of the horizontal and vertical shifts must have the same cost (denoted as ``a`` ), all the diagonal shifts must have the
 same cost (denoted as ``b`` ), and all knight's moves must have
 the same cost (denoted as ``c`` ). For the ``CV_DIST_C`` and ``CV_DIST_L1`` types, the distance is calculated precisely,
-whereas for ``CV_DIST_L2`` (Euclidian distance) the distance
+whereas for ``CV_DIST_L2`` (Euclidean distance) the distance
 can be calculated only with a relative error (a
 :math:`5\times 5` mask
 gives more accurate results). For ``a``,``b`` , and ``c`` , OpenCV uses the values suggested in the original paper:
@@ -449,38 +464,40 @@ gives more accurate results). For ``a``,``b`` , and ``c`` , OpenCV uses the valu
     ``CV_DIST_L2``  :math:`(5\times 5)`  a=1, b=1.4, c=2.1969 \
     ==============  ===================  ======================
 
-Typically, for a fast, coarse distance estimation ``CV_DIST_L2``,a
+Typically, for a fast, coarse distance estimation ``CV_DIST_L2``, a
 :math:`3\times 3` mask is used. For a more accurate distance estimation ``CV_DIST_L2`` , a
 :math:`5\times 5` mask or the precise algorithm is used.
 Note that both the precise and the approximate algorithms are linear on the number of pixels.
 
 The second variant of the function does not only compute the minimum distance for each pixel
 :math:`(x, y)` but also identifies the nearest connected
-component consisting of zero pixels. Index of the component is stored in
+component consisting of zero pixels (``labelType==DIST_LABEL_CCOMP``) or the nearest zero pixel (``labelType==DIST_LABEL_PIXEL``). Index of the component/pixel is stored in
 :math:`\texttt{labels}(x, y)` .
-The connected components of zero pixels are also found and marked by the function.
+When ``labelType==DIST_LABEL_CCOMP``, the function automatically finds connected components of zero pixels in the input image and marks them with distinct labels. When ``labelType==DIST_LABEL_CCOMP``, the function scans through the input image and marks all the zero pixels with distinct labels.
 
 In this mode, the complexity is still linear.
 That is, the function provides a very fast way to compute the Voronoi diagram for a binary image.
-Currently, the second variant can use only the approximate distance transform algorithm.
-
-.. index:: floodFill
-
-.. _floodFill:
+Currently, the second variant can use only the approximate distance transform algorithm, i.e. ``maskSize=CV_DIST_MASK_PRECISE`` is not supported yet.
 
 floodFill
 -------------
-.. cpp:function:: int floodFill( InputOutputArray image, Point seed, Scalar newVal, Rect* rect=0, Scalar loDiff=Scalar(), Scalar upDiff=Scalar(),               int flags=4 )
+Fills a connected component with the given color.
 
-.. cpp:function:: int floodFill( InputOutputArray image, InputOutputArray mask, Point seed, Scalar newVal, Rect* rect=0, Scalar loDiff=Scalar(), Scalar upDiff=Scalar(), int flags=4 )
+.. ocv:function:: int floodFill( InputOutputArray image, Point seed, Scalar newVal, Rect* rect=0, Scalar loDiff=Scalar(), Scalar upDiff=Scalar(),               int flags=4 )
 
-    Fills a connected component with the given color.
+.. ocv:function:: int floodFill( InputOutputArray image, InputOutputArray mask, Point seed, Scalar newVal, Rect* rect=0, Scalar loDiff=Scalar(), Scalar upDiff=Scalar(), int flags=4 )
+
+.. ocv:pyfunction:: cv2.floodFill(image, mask, seedPoint, newVal[, loDiff[, upDiff[, flags]]]) -> retval, rect
+
+.. ocv:cfunction:: void cvFloodFill( CvArr* image, CvPoint seedPoint, CvScalar newVal, CvScalar loDiff=cvScalarAll(0), CvScalar upDiff=cvScalarAll(0), CvConnectedComp* comp=NULL, int flags=4, CvArr* mask=NULL )
+.. ocv:pyoldfunction:: cv.FloodFill(image, seedPoint, newVal, loDiff=(0, 0, 0, 0), upDiff=(0, 0, 0, 0), flags=4, mask=None)-> comp
 
     :param image: Input/output 1- or 3-channel, 8-bit, or floating-point image. It is modified by the function unless the  ``FLOODFILL_MASK_ONLY``  flag is set in the second variant of the function. See the details below.
 
     :param mask: (For the second function only) Operation mask that should be a single-channel 8-bit image, 2 pixels wider and 2 pixels taller. The function uses and updates the mask, so you take responsibility of initializing the  ``mask``  content. Flood-filling cannot go across non-zero pixels in the mask. For example, an edge detector output can be used as a mask to stop filling at edges. It is possible to use the same mask in multiple calls to the function to make sure the filled area does not overlap.  
-	
-	**Note** : Since the mask is larger than the filled image, a pixel  :math:`(x, y)`  in  ``image``  corresponds to the pixel  :math:`(x+1, y+1)`  in the  ``mask`` .
+
+        .. note:: Since the mask is larger than the filled image, a pixel  :math:`(x, y)`  in  ``image``  corresponds to the pixel  :math:`(x+1, y+1)`  in the  ``mask`` .
+
     :param seed: Starting point.
 
     :param newVal: New value of the repainted domain pixels.
@@ -505,7 +522,7 @@ The functions ``floodFill`` fill a connected component starting from the seed po
 
         \texttt{src} (x',y')- \texttt{loDiff} \leq \texttt{src} (x,y)  \leq \texttt{src} (x',y')+ \texttt{upDiff}
 
-    in the case of grayscale image and floating range
+    in case of a grayscale image and floating range
 
 * 
 
@@ -513,7 +530,7 @@ The functions ``floodFill`` fill a connected component starting from the seed po
 
         \texttt{src} ( \texttt{seed} .x, \texttt{seed} .y)- \texttt{loDiff} \leq \texttt{src} (x,y)  \leq \texttt{src} ( \texttt{seed} .x, \texttt{seed} .y)+ \texttt{upDiff}
 
-    in the case of grayscale image and fixed range
+    in case of a grayscale image and fixed range
 
 *
 
@@ -531,7 +548,7 @@ The functions ``floodFill`` fill a connected component starting from the seed po
 
         \texttt{src} (x',y')_b- \texttt{loDiff} _b \leq \texttt{src} (x,y)_b \leq \texttt{src} (x',y')_b+ \texttt{upDiff} _b
 
-    in the case of color image and floating range
+    in case of a color image and floating range
 
 
 *
@@ -550,73 +567,53 @@ The functions ``floodFill`` fill a connected component starting from the seed po
 
         \texttt{src} ( \texttt{seed} .x, \texttt{seed} .y)_b- \texttt{loDiff} _b \leq \texttt{src} (x,y)_b \leq \texttt{src} ( \texttt{seed} .x, \texttt{seed} .y)_b+ \texttt{upDiff} _b
 
-    in the case of color image and fixed range
+    in case of a color image and fixed range
 
 where
 :math:`src(x',y')` is the value of one of pixel neighbors that is already known to belong to the component. That is, to be added to the connected component, a color/brightness of the pixel should be close enough to:
 
 *
-    Color/brightness of one of its neighbors that already belong to the connected component in case of floating range.
+    Color/brightness of one of its neighbors that already belong to the connected component in case of a floating range.
 
 *
-    Color/brightness of the seed point in case of fixed range.
+    Color/brightness of the seed point in case of a fixed range.
 
 Use these functions to either mark a connected component with the specified color in-place, or build a mask and then extract the contour, or copy the region to another image, and so on. Various modes of the function are demonstrated in the ``floodfill.cpp`` sample.
 
-See Also:
-:cpp:func:`findContours`
+.. seealso:: :ocv:func:`findContours`
 
-.. index:: inpaint
 
-.. _inpaint:
-
-inpaint
------------
-.. cpp:function:: void inpaint( InputArray src, InputArray inpaintMask, OutputArray dst, double inpaintRadius, int flags )
-
-    Restores the selected region in an image using the region neighborhood.
-
-    :param src: Input 8-bit 1-channel or 3-channel image.
-
-    :param inpaintMask: Inpainting mask, 8-bit 1-channel image. Non-zero pixels indicate the area that needs to be inpainted.
-
-    :param dst: Output image with the same size and type as  ``src`` .
-    
-    :param inpaintRadius: Radius of a circlular neighborhood of each point inpainted that is considered by the algorithm.
-
-    :param flags: Inpainting method that could be one of the following:
-
-            * **INPAINT_NS** 	Navier-Stokes based method.
-
-            * **INPAINT_TELEA** 	Method by Alexandru Telea  Telea04.
-
-The function reconstructs the selected image area from the pixel near the area boundary. The function may be used to remove dust and scratches from a scanned photo, or to remove undesirable objects from still images or video. See
-http://en.wikipedia.org/wiki/Inpainting
-for more details.
-
-.. index:: integral
 
 integral
 ------------
-.. cpp:function:: void integral( InputArray image, OutputArray sum, int sdepth=-1 )
+Calculates the integral of an image.
 
-.. cpp:function:: void integral( InputArray image, OutputArray sum, OutputArray sqsum, int sdepth=-1 )
+.. ocv:function:: void integral( InputArray image, OutputArray sum, int sdepth=-1 )
 
-.. cpp:function:: void integral( InputArray image, OutputArray sum,  OutputArray sqsum, OutputArray tilted, int sdepth=-1 )
+.. ocv:function:: void integral( InputArray image, OutputArray sum, OutputArray sqsum, int sdepth=-1 )
 
-    Calculates the integral of an image.
+.. ocv:function:: void integral( InputArray image, OutputArray sum,  OutputArray sqsum, OutputArray tilted, int sdepth=-1 )
+
+.. ocv:pyfunction:: cv2.integral(src[, sum[, sdepth]]) -> sum
+
+.. ocv:pyfunction:: cv2.integral2(src[, sum[, sqsum[, sdepth]]]) -> sum, sqsum
+
+.. ocv:pyfunction:: cv2.integral3(src[, sum[, sqsum[, tilted[, sdepth]]]]) -> sum, sqsum, tilted
+
+.. ocv:cfunction:: void cvIntegral( const CvArr* image, CvArr* sum, CvArr* sqsum=NULL, CvArr* tiltedSum=NULL )
+.. ocv:pyoldfunction:: cv.Integral(image, sum, sqsum=None, tiltedSum=None)-> None
 
     :param image: Source image as :math:`W \times H` , 8-bit or floating-point (32f or 64f).
 
     :param sum: Integral image as  :math:`(W+1)\times (H+1)` , 32-bit integer or floating-point (32f or 64f).
 
-    :param sqsum: Integral image for squared pixel values. It will be :math:`(W+1)\times (H+1)`, double-precision floating-point (64f) array.
+    :param sqsum: Integral image for squared pixel values. It is :math:`(W+1)\times (H+1)`, double-precision floating-point (64f) array.
 
-    :param tilted: Integral for the image rotated by 45 degrees. It will be :math:`(W+1)\times (H+1)` array  with the same data type as ``sum``.
+    :param tilted: Integral for the image rotated by 45 degrees. It is :math:`(W+1)\times (H+1)` array  with the same data type as ``sum``.
     
     :param sdepth: Desired depth of the integral and the tilted integral images,  ``CV_32S``, ``CV_32F``,  or  ``CV_64F``.
 
-The functions calculate one or more integral images for the source image as following:
+The functions calculate one or more integral images for the source image as follows:
 
 .. math::
 
@@ -630,11 +627,11 @@ The functions calculate one or more integral images for the source image as foll
 
     \texttt{tilted} (X,Y) =  \sum _{y<Y,abs(x-X+1) \leq Y-y-1}  \texttt{image} (x,y)
 
-Using these integral images, you can calculate sum, mean and standard deviation over a specific up-right or rotated rectangular region of the image in a constant time, for example:
+Using these integral images, you can calculate sa um, mean, and standard deviation over a specific up-right or rotated rectangular region of the image in a constant time, for example:
 
 .. math::
 
-    \sum _{x_1 \leq x < x_2,  \, y_1  \leq y < y_2}  \texttt{image} (x,y) =  \texttt{sum} (x_2,y_2)- \texttt{sum} (x_1,y_2)- \texttt{sum} (x_2,y_1)+ \texttt{sum} (x_1,x_1)
+    \sum _{x_1 \leq x < x_2,  \, y_1  \leq y < y_2}  \texttt{image} (x,y) =  \texttt{sum} (x_2,y_2)- \texttt{sum} (x_1,y_2)- \texttt{sum} (x_2,y_1)+ \texttt{sum} (x_1,y_1)
 
 It makes possible to do a fast blurring or fast block correlation with a variable window size, for example. In case of multi-channel images, sums for each channel are accumulated independently.
 
@@ -642,17 +639,22 @@ As a practical example, the next figure shows the calculation of the integral of
 
 .. image:: pics/integral.png
 
-.. index:: threshold
 
-.. _threshold:
+
+
 
 threshold
 -------------
-.. cpp:function:: double threshold( InputArray src, OutputArray dst, double thresh, double maxVal, int thresholdType )
+Applies a fixed-level threshold to each array element.
 
-    Applies a fixed-level threshold to each array element.
+.. ocv:function:: double threshold( InputArray src, OutputArray dst, double thresh, double maxVal, int thresholdType )
 
-    :param src: Source array (single-channel, 8-bit of 32-bit floating point)
+.. ocv:pyfunction:: cv2.threshold(src, thresh, maxval, type[, dst]) -> retval, dst
+
+.. ocv:cfunction:: double cvThreshold( const CvArr* src, CvArr* dst, double threshold, double maxValue, int thresholdType )
+.. ocv:pyoldfunction:: cv.Threshold(src, dst, threshold, maxValue, thresholdType)-> None
+
+    :param src: Source array (single-channel, 8-bit of 32-bit floating point).
 
     :param dst: Destination array of the same size and type as  ``src`` .
     
@@ -665,7 +667,7 @@ threshold
 The function applies fixed-level thresholding
 to a single-channel array. The function is typically used to get a
 bi-level (binary) image out of a grayscale image (
-:cpp:func:`compare` could
+:ocv:func:`compare` could
 be also used for this purpose) or for removing a noise, that is, filtering
 out pixels with too small or too large values. There are several
 types of thresholding supported by the function. They are determined by ``thresholdType`` :
@@ -702,65 +704,53 @@ types of thresholding supported by the function. They are determined by ``thresh
 
 Also, the special value ``THRESH_OTSU`` may be combined with
 one of the above values. In this case, the function determines the optimal threshold
-value using Otsu's algorithm and uses it instead of the specified ``thresh`` .
+value using the Otsu's algorithm and uses it instead of the specified ``thresh`` .
 The function returns the computed threshold value.
-Currently, Otsu's method is implemented only for 8-bit images.
+Currently, the Otsu's method is implemented only for 8-bit images. 
+
 
 .. image:: pics/threshold.png
 
-See Also:
-:cpp:func:`adaptiveThreshold`,
-:cpp:func:`findContours`,
-:cpp:func:`compare`,
-:cpp:func:`min`,
-:cpp:func:`max`
+.. seealso::
 
-.. index:: watershed
+    :ocv:func:`adaptiveThreshold`,
+    :ocv:func:`findContours`,
+    :ocv:func:`compare`,
+    :ocv:func:`min`,
+    :ocv:func:`max`
+
 
 watershed
 -------------
-.. cpp:function:: void watershed( InputArray image, InputOutputArray markers )
+Performs a marker-based image segmentation using the watershed algorithm.
 
-    Performs a marker-based image segmentation using the watershed algrorithm.
+.. ocv:function:: void watershed( InputArray image, InputOutputArray markers )
+
+.. ocv:cfunction:: void cvWatershed( const CvArr* image, CvArr* markers )
+
+.. ocv:pyfunction:: cv2.watershed(image, markers) -> None
 
     :param image: Input 8-bit 3-channel image.
 
     :param markers: Input/output 32-bit single-channel image (map) of markers. It should have the same size as  ``image`` .
 
-The function implements one of the variants
-of watershed, non-parametric marker-based segmentation algorithm,
-described in [Meyer92]. Before passing the image to the
-function, you have to roughly outline the desired regions in the image ``markers`` with positive (
-:math:`>0` ) indices. So, every region is
-represented as one or more connected components with the pixel values
-1, 2, 3, and so on. Such markers can be retrieved from a binary mask
-using
-:cpp:func:`findContours` and
-:cpp:func:`drawContours` (see the ``watershed.cpp`` demo).
-The markers are "seeds" of the future image
-regions. All the other pixels in ``markers`` , whose relation to the
-outlined regions is not known and should be defined by the algorithm,
-should be set to 0's. In the function output, each pixel in
-markers is set to a value of the "seed" components or to -1 at
-boundaries between the regions.
+The function implements one of the variants of watershed, non-parametric marker-based segmentation algorithm, described in [Meyer92]_.
 
-**Note**: Every two neighbor connected
-components are not necessarily separated by a watershed boundary (-1's pixels); for
-example, when such tangent components exist in the initial
-marker image. Visual demonstration and usage example of the function
-can be found in the OpenCV samples directory (see the ``watershed.cpp`` demo).
+Before passing the image to the function, you have to roughly outline the desired regions in the image ``markers`` with positive (``>0``) indices. So, every region is represented as one or more connected components with the pixel values 1, 2, 3, and so on. Such markers can be retrieved from a binary mask using :ocv:func:`findContours` and :ocv:func:`drawContours` (see the ``watershed.cpp`` demo). The markers are "seeds" of the future image regions. All the other pixels in ``markers`` , whose relation to the outlined regions is not known and should be defined by the algorithm, should be set to 0's. In the function output, each pixel in markers is set to a value of the "seed" components or to -1 at boundaries between the regions.
 
-See Also:
-:cpp:func:`findContours`
+Visual demonstration and usage example of the function can be found in the OpenCV samples directory (see the ``watershed.cpp`` demo).
 
-.. index:: grabCut
+.. note:: Any two neighbor connected components are not necessarily separated by a watershed boundary (-1's pixels); for example, they can touch each other in the initial marker image passed to the function.
+
+.. seealso:: :ocv:func:`findContours`
 
 grabCut
 -------
+Runs the GrabCut algorithm.
 
-.. cpp:function:: void grabCut(InputArray image, InputOutputArray mask, Rect rect, InputOutputArray bgdModel, InputOutputArray fgdModel, int iterCount, int mode )
+.. ocv:function:: void grabCut(InputArray image, InputOutputArray mask, Rect rect, InputOutputArray bgdModel, InputOutputArray fgdModel, int iterCount, int mode )
 
-    Runs the GrabCut algorithm.
+.. ocv:pyfunction:: cv2.grabCut(img, mask, rect, bgdModel, fgdModel, iterCount[, mode]) -> None
 
     :param image: Input 8-bit 3-channel image.
 
@@ -776,17 +766,27 @@ grabCut
 
     :param rect: ROI containing a segmented object. The pixels outside of the ROI are marked as "obvious background". The parameter is only used when  ``mode==GC_INIT_WITH_RECT`` .
     
-    :param bgdModel, fgdModel: Temporary arrays used for segmentation. Do not modify them while you are processing the same image.
+    :param bgdModel: Temporary array for the background model. Do not modify it while you are processing the same image.
+    
+    :param fgdModel: Temporary arrays for the foreground model. Do not modify it while you are processing the same image.
 
     :param iterCount: Number of iterations the algorithm should make before returning the result. Note that the result can be refined with further calls with  ``mode==GC_INIT_WITH_MASK``  or  ``mode==GC_EVAL`` .
     
     :param mode: Operation mode that could be one of the following:
 
-        * **GC_INIT_WITH_RECT** 	The function initializes the state and the mask using the provided rectangle. After that it runs  ``iterCount``  iterations of the algorithm.
+        * **GC_INIT_WITH_RECT**     The function initializes the state and the mask using the provided rectangle. After that it runs  ``iterCount``  iterations of the algorithm.
 
-        * **GC_INIT_WITH_MASK** 	The function initializes the state using the provided mask. Note that  ``GC_INIT_WITH_RECT``  and  ``GC_INIT_WITH_MASK``  can be combined. Then, all the pixels outside of the ROI are automatically initialized with  ``GC_BGD`` .
+        * **GC_INIT_WITH_MASK**     The function initializes the state using the provided mask. Note that  ``GC_INIT_WITH_RECT``  and  ``GC_INIT_WITH_MASK``  can be combined. Then, all the pixels outside of the ROI are automatically initialized with  ``GC_BGD`` .
 
-        * **GC_EVAL** 	The value means that algorithm should just resume.
+        * **GC_EVAL**     The value means that the algorithm should just resume.
 
 The function implements the `GrabCut image segmentation algorithm <http://en.wikipedia.org/wiki/GrabCut>`_.
-See the sample grabcut.cpp to learn how to use the function.
+See the sample ``grabcut.cpp`` to learn how to use the function.
+
+.. [Borgefors86] Borgefors, Gunilla, *Distance transformations in digital images*. Comput. Vision Graph. Image Process. 34 3, pp 344–371 (1986)
+
+.. [Felzenszwalb04] Felzenszwalb, Pedro F. and Huttenlocher, Daniel P. *Distance Transforms of Sampled Functions*, TR2004-1963, TR2004-1963 (2004)
+
+.. [Meyer92] Meyer, F. *Color Image Segmentation*, ICIP92, 1992
+
+.. [Telea04] Alexandru Telea, *An Image Inpainting Technique Based on the Fast Marching Method*. Journal of Graphics, GPU, and Game Tools 9 1, pp 23-34 (2004)

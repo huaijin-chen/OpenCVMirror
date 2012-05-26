@@ -3,7 +3,7 @@
 print "OpenCV Python version of convexhull"
 
 # import the necessary things for OpenCV
-import cv
+import cv2.cv as cv
 
 # to generate random values
 import random
@@ -62,3 +62,4 @@ if __name__ == '__main__':
         if k == 27:
             # user has press the ESC key, so exit
             break
+    cv.DestroyAllWindows()

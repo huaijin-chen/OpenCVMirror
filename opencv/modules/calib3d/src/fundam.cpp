@@ -84,9 +84,9 @@ int CvHomographyEstimator::runKernel( const CvMat* m1, const CvMat* m2, CvMat* H
     const CvPoint2D64f* M = (const CvPoint2D64f*)m1->data.ptr;
     const CvPoint2D64f* m = (const CvPoint2D64f*)m2->data.ptr;
 
-    double LtL[9][9], W[9][9], V[9][9];
+    double LtL[9][9], W[9][1], V[9][9];
     CvMat _LtL = cvMat( 9, 9, CV_64F, LtL );
-    CvMat matW = cvMat( 9, 9, CV_64F, W );
+    CvMat matW = cvMat( 9, 1, CV_64F, W );
     CvMat matV = cvMat( 9, 9, CV_64F, V );
     CvMat _H0 = cvMat( 3, 3, CV_64F, V[8] );
     CvMat _Htemp = cvMat( 3, 3, CV_64F, V[7] );
@@ -253,7 +253,7 @@ cvFindHomography( const CvMat* objectPoints, const CvMat* imagePoints,
     if( !tempMask.empty() )
         cvSet( tempMask, cvScalarAll(1.) );
 
-    CvHomographyEstimator estimator( MIN(count, 4) );
+    CvHomographyEstimator estimator(4);
     if( count == 4 )
         method = 0;
     if( method == CV_LMEDS )
@@ -499,15 +499,15 @@ int CvFMEstimator::run8Point( const CvMat* _m1, const CvMat* _m2, CvMat* _fmatri
                 a[j*9+k] += r[j]*r[k];
     }
 
-    cvSVD( &A, &W, 0, &V, CV_SVD_MODIFY_A + CV_SVD_V_T );
+    cvEigenVV(&A, &V, &W);
 
-    for( i = 0; i < 8; i++ )
+    for( i = 0; i < 9; i++ )
     {
         if( fabs(w[i]) < DBL_EPSILON )
             break;
     }
 
-    if( i < 7 )
+    if( i < 8 )
         return 0;
 
     F0 = cvMat( 3, 3, CV_64F, v + 9*8 ); // take the last column of v as a solution of Af = 0
@@ -616,7 +616,7 @@ CV_IMPL int cvFindFundamentalMat( const CvMat* points1, const CvMat* points2,
             (mask->rows == 1 || mask->cols == 1) &&
             mask->rows*mask->cols == count );
     }
-    if( mask || count > 8 )
+    if( mask || count >= 8 )
         tempMask = cvCreateMat( 1, count, CV_8U );
     if( !tempMask.empty() )
         cvSet( tempMask, cvScalarAll(1.) );
@@ -624,9 +624,9 @@ CV_IMPL int cvFindFundamentalMat( const CvMat* points1, const CvMat* points2,
     CvFMEstimator estimator(7);
     if( count == 7 )
         result = estimator.run7Point(m1, m2, &_F9x3);
-    else if( count == 8 || method == CV_FM_8POINT )
+    else if( method == CV_FM_8POINT )
         result = estimator.run8Point(m1, m2, &_F3x3);
-    else if( count >= 8 )
+    else
     {
         if( param1 <= 0 )
             param1 = 3;
@@ -680,7 +680,13 @@ CV_IMPL void cvComputeCorrespondEpilines( const CvMat* points, int pointImageID,
     if( (depth != CV_32F && depth != CV_64F) || (cn != 1 && cn != 2 && cn != 3) )
         CV_Error( CV_StsUnsupportedFormat, "The format of point matrix is unsupported" );
 
-    if( points->rows > points->cols )
+    if( cn > 1 )
+    {
+        dims = cn;
+        CV_Assert( points->rows == 1 || points->cols == 1 );
+        count = points->rows * points->cols;
+    }
+    else if( points->rows > points->cols )
     {
         dims = cn*points->cols;
         count = points->rows;
@@ -689,7 +695,7 @@ CV_IMPL void cvComputeCorrespondEpilines( const CvMat* points, int pointImageID,
     {
         if( (points->rows > 1 && cn > 1) || (points->rows == 1 && cn == 1) )
             CV_Error( CV_StsBadSize, "The point matrix does not have a proper layout (2xn, 3xn, nx2 or nx3)" );
-        dims = cn * points->rows;
+        dims = points->rows;
         count = points->cols;
     }
 
@@ -713,7 +719,13 @@ CV_IMPL void cvComputeCorrespondEpilines( const CvMat* points, int pointImageID,
     if( (abc_depth != CV_32F && abc_depth != CV_64F) || (abc_cn != 1 && abc_cn != 3) )
         CV_Error( CV_StsUnsupportedFormat, "The format of the matrix of lines is unsupported" );
 
-    if( lines->rows > lines->cols )
+    if( abc_cn > 1 )
+    {
+        abc_dims = abc_cn;
+        CV_Assert( lines->rows == 1 || lines->cols == 1 );
+        abc_count = lines->rows * lines->cols;
+    }
+    else if( lines->rows > lines->cols )
     {
         abc_dims = abc_cn*lines->cols;
         abc_count = lines->rows;
@@ -722,7 +734,7 @@ CV_IMPL void cvComputeCorrespondEpilines( const CvMat* points, int pointImageID,
     {
         if( (lines->rows > 1 && abc_cn > 1) || (lines->rows == 1 && abc_cn == 1) )
             CV_Error( CV_StsBadSize, "The lines matrix does not have a proper layout (3xn or nx3)" );
-        abc_dims = abc_cn * lines->rows;
+        abc_dims = lines->rows;
         abc_count = lines->cols;
     }
 
@@ -735,7 +747,7 @@ CV_IMPL void cvComputeCorrespondEpilines( const CvMat* points, int pointImageID,
     elem_size = CV_ELEM_SIZE(depth);
     abc_elem_size = CV_ELEM_SIZE(abc_depth);
 
-    if( points->rows == dims )
+    if( cn == 1 && points->rows == dims )
     {
         plane_stride = points->step;
         stride = elem_size;
@@ -746,7 +758,7 @@ CV_IMPL void cvComputeCorrespondEpilines( const CvMat* points, int pointImageID,
         stride = points->rows == 1 ? dims*elem_size : points->step;
     }
 
-    if( lines->rows == 3 )
+    if( abc_cn == 1 && lines->rows == 3 )
     {
         abc_plane_stride = lines->step;
         abc_stride = abc_elem_size;

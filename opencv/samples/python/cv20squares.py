@@ -5,7 +5,7 @@ Find Squares in image by finding countours and filtering
 #otherwise ok
 
 import math
-import cv
+import cv2.cv as cv
 
 def angle(pt1, pt2, pt0):
     "calculate angle contained by 3 points(x, y)"
@@ -164,3 +164,4 @@ def main():
 
 if __name__ == "__main__":
     main()    
+    cv.DestroyAllWindows()
